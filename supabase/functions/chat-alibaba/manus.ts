@@ -472,18 +472,55 @@ export async function runPrimaryAgent(opts: {
     }
   };
 
+  /**
+   * Keeps the transcript small without losing the thread: system prompt, the
+   * user request and the last few steps stay verbatim, everything older becomes
+   * a one-line digest. Compaction always starts the tail at an assistant turn so
+   * every `tool` message keeps its matching `tool_calls`.
+   */
+  const compact = () => {
+    if (messages.length <= COMPACT_AFTER) return;
+    const head = messages.slice(0, 2);
+    let cut = messages.length - KEEP_TAIL;
+    while (cut < messages.length && messages[cut].role !== "assistant") cut += 1;
+    if (cut >= messages.length) return;
+    const dropped = messages.slice(2, cut);
+    const names = dropped
+      .filter((m) => m.role === "assistant" && Array.isArray((m as any).tool_calls))
+      .flatMap((m) => ((m as any).tool_calls as any[]).map((c) => String(c?.function?.name ?? "")))
+      .filter(Boolean);
+    const digest = {
+      role: "user" as const,
+      content: `EARLIER STEPS (compacted). Tools already run: ${
+        [...new Set(names)].join(", ") || "none"
+      }. Findings are already captured — do not repeat this work.${
+        notes ? `\nWorking notes: ${notes.slice(0, 600)}` : ""
+      }`,
+    };
+    messages.splice(0, messages.length, ...head, digest, ...messages.slice(cut));
+  };
+
+  /** Advertised tool catalog: full while planning, then core + already used. */
+  const catalog = (step: number) => {
+    if (step < FULL_CATALOG_STEPS) return [...TOOLS, ...ACTION_TOOLS];
+    const keep = ACTION_TOOLS.filter((tool: any) => used.has(String(tool?.function?.name ?? "")));
+    return [...TOOLS, ...keep];
+  };
+
   try {
     for (let step = 0; step < MAX_STEPS; step += 1) {
       if (Date.now() - started > LOOP_BUDGET_MS) break;
       steps = step + 1;
+      compact();
 
       const data = await raw(LEAD_MODELS, {
         temperature: 0.25,
-        max_tokens: 1400,
+        max_tokens: 1100,
         parallel_tool_calls: true,
-        tools: [...TOOLS, ...ACTION_TOOLS],
+        tools: catalog(step),
         messages,
       });
+
       const message = data?.choices?.[0]?.message;
       if (!message) break;
 
