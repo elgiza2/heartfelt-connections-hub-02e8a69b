@@ -2,7 +2,6 @@
  *  Reads SKILL.md (name / description / body) and stores every other file in
  *  the `skills` storage bucket, recorded in public.skill_files. */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { unzip } from "https://deno.land/x/zipjs@v2.7.32/index.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
