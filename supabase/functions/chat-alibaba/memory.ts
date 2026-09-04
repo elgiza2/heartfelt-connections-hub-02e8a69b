@@ -17,20 +17,40 @@ const STOPWORDS = new Set([
   "عن", "الي", "إلى", "هو", "هي", "ما", "مع", "ان", "أن", "كان", "ده", "دي",
 ]);
 
-type MemoryRow = { kind: string; key: string; value: string; confidence: number };
+type MemoryRow = {
+  kind: string;
+  key: string;
+  value: string;
+  confidence: number;
+  updated_at?: string | null;
+};
 
 function tokens(text: string): string[] {
   return (text.toLowerCase().match(/[\p{L}\p{N}_]{3,}/gu) ?? []).filter((t) => !STOPWORDS.has(t));
 }
 
-function score(row: MemoryRow, wanted: Set<string>): number {
+function score(row: MemoryRow, wanted: Set<string>, question: string): number {
   const bag = new Set(tokens(`${row.key} ${row.value}`));
   let overlap = 0;
   for (const token of bag) if (wanted.has(token)) overlap += 1;
+  // Rare-term weighting: matching a long distinctive token means more than a
+  // short common one, so retrieval stays sharp as the memory store grows.
+  let weighted = 0;
+  for (const token of bag) if (wanted.has(token)) weighted += Math.min(1.5, token.length / 6);
   // Preferences and identity facts stay useful even without lexical overlap.
   const durable = /preference|identity|profile|style|constraint/i.test(row.kind) ? 1.2 : 0;
-  return overlap + durable + (row.confidence || 0) * 0.5;
+  // Direct key mention in the question is the strongest possible signal.
+  const keyHit = row.key && question.toLowerCase().includes(row.key.toLowerCase().replace(/[_-]/g, " "))
+    ? 1.5
+    : 0;
+  // Recency decay: a fact touched this week outranks a year-old duplicate.
+  const ageDays = row.updated_at
+    ? Math.max(0, (Date.now() - new Date(row.updated_at).getTime()) / 86_400_000)
+    : 90;
+  const recency = Math.exp(-ageDays / 120) * 0.8;
+  return overlap + weighted + durable + keyHit + recency + (row.confidence || 0) * 0.5;
 }
+
 
 /**
  * Global memory identity.
@@ -56,22 +76,40 @@ export async function memoryIdentity(
 /** Compact memory block for the system prompt, or "" when nothing is relevant. */
 export async function recall(admin: any, userId: string | null, question: string): Promise<string> {
   if (!userId) return "";
-  const { data } = await admin
-    .from("agent_memory")
-    .select("kind,key,value,confidence")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(200);
-  const rows = (data ?? []) as MemoryRow[];
+  const [{ data }, { data: extra }] = await Promise.all([
+    admin
+      .from("agent_memory")
+      .select("kind,key,value,confidence,updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(300),
+    // Second store written by `memory-extract`; both are read so nothing the
+    // system ever learned about the user is invisible to the agent.
+    admin
+      .from("user_memory_entries")
+      .select("kind,key,value,confidence,updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(150)
+      .then((r: any) => r, () => ({ data: [] })),
+  ]);
+  const seen = new Set<string>();
+  const rows = ([...(data ?? []), ...(extra ?? [])] as MemoryRow[]).filter((row) => {
+    const id = `${row.kind}:${row.key}`.toLowerCase();
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return Boolean(row.key && row.value);
+  });
   if (!rows.length) return "";
 
   const wanted = new Set(tokens(question));
   const picked = rows
-    .map((row) => ({ row, weight: score(row, wanted) }))
+    .map((row) => ({ row, weight: score(row, wanted, question) }))
     .filter((entry) => entry.weight > 0.9)
     .sort((a, b) => b.weight - a.weight)
     .slice(0, MAX_RECALL)
     .map(({ row }) => `- (${row.kind}) ${row.key}: ${String(row.value).slice(0, 300)}`);
+
   if (!picked.length) return "";
 
   return `USER MEMORY (facts remembered from earlier conversations — apply silently, never list them back, and prefer the current message when it contradicts them):\n${

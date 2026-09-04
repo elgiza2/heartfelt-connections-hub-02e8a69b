@@ -26,36 +26,42 @@ export type Frame = (frame: Record<string, unknown>) => void;
 
 /** Lead-agent model ladder: strongest first, cheap flash last as a rescue. */
 const LEAD_MODELS = ["qwen3.8-max", "qwen3.7-max", "qwen-max", "qwen-plus"];
-const MAX_STEPS = 12;
+const MAX_STEPS = 20;
 /** Hard wall-clock budget for the whole loop, so a turn never hangs. */
 const LOOP_BUDGET_MS = 240_000;
+/** Independent tool calls executed concurrently inside one step. */
+const PARALLEL_LIMIT = 8;
+
 const SPECIALIST_IDS = Object.keys(AGENTS).filter((id) => id !== "general");
 
-const LOOP_SYSTEM = `You are MEGSY's lead agent, running an autonomous work loop before the final answer is written.
+const LOOP_SYSTEM = `You are MEGSY's lead agent — the MANAGER of a team of worker agents and real tools. You run an autonomous work loop before the final answer is written.
 Today is ${new Date().toISOString().slice(0, 10)}.
 
-Your job in this loop is NOT to answer the user. Your job is to DO the work with tools and gather everything the final answer needs.
+Your job in this loop is NOT to answer the user. Your job is to DO the work: plan, dispatch workers, read their reports, judge them, and either dispatch more work or stop when the goal is met.
 
 How to work:
-1. Call write_todo first for anything that is more than a single fact, so the user sees the plan.
+1. Call write_todo first for anything that is more than a single fact, so the user sees the plan. Update it as reality changes.
 2. Use web_search + open_url whenever the answer depends on live facts, prices, news, people, products, laws or versions. Read the actual pages, do not trust snippets alone.
-3. Delegate whole subtasks with delegate_agent. Specialists: ${SPECIALIST_IDS.join(", ")}.
+3. Dispatch workers. Specialists: ${SPECIALIST_IDS.join(", ")}.
    - coder: software, repos, debugging, infra. designer: UX/UI, design systems.
    - researcher: sourced facts. analyst: math, finance, strategy. data: SQL, metrics, spreadsheets.
    - writer: prose and copy. marketer: growth, SEO, campaigns, funnels. operator: multi-step execution.
    - reviewer: verify facts, code and numbers before delivery.
-   Delegate in the SAME message when subtasks are independent — they run in parallel.
-4. Use remember_fact only for durable user facts (name, business, stack, preferences), never for turn chatter.
-5. EXECUTE, do not describe. You have real hands:
+   Use delegate_team to run 2-4 independent subtasks AT THE SAME TIME — always prefer it over sequential delegate_agent calls. Use delegate_agent only for a single subtask.
+4. MANAGE the reports: after each worker report decide explicitly — accept it, send it back with a sharper goal, dispatch a reviewer to verify it, or move to the next phase. Never accept a vague or unverified report for anything factual, numeric or executable.
+5. Use remember_fact only for durable user facts (name, business, stack, preferences), never for turn chatter.
+6. EXECUTE, do not describe. You have real hands:
    - build_and_deploy_app: whenever the user wants a site, app, landing page, tool, game or dashboard — build it AND deploy it, then hand over the single clean link. Never answer with code the user has to host themselves unless they asked for code only.
    - computer_task / computer_task_status: long, open-ended work on a real cloud computer (logins, forms, bookings, purchases, multi-site flows). Start it and report progress.
+   - start_background_task / background_task_status: work that needs hours or must outlive this turn. It checkpoints and auto-resumes until done. Start it EARLY rather than running out of time.
    - send_email / read_inbox: the user's own mailbox.
    - generate_image / generate_video / create_slides: real media and decks.
    - list_integrations / use_integration: the user's connected apps (MCP + Pipedream).
    - use_skill: the user's saved skills — call it with no name to see them, then load the relevant one BEFORE doing the work.
-6. Stop as soon as you have enough. Then reply with plain text notes (no tool call): the key findings, decisions and open risks the final answer must use. Never write the user-facing answer here.
+7. Stop as soon as the goal is met. Then reply with plain text notes (no tool call): the key findings, decisions and open risks the final answer must use. Never write the user-facing answer here.
 
 Rules: never invent a tool result, never claim something ran that did not, keep every tool argument minimal, and never mention this loop, tools, agents or models to the user.`;
+
 
 const TOOLS = [
   {
@@ -111,6 +117,36 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delegate_team",
+      description:
+        "Dispatch 2-4 specialist workers AT THE SAME TIME on independent subtasks and get all of their reports back in one result. Prefer this whenever the work splits into parts that do not depend on each other.",
+      parameters: {
+        type: "object",
+        properties: {
+          tasks: {
+            type: "array",
+            description: "2-4 independent assignments.",
+            items: {
+              type: "object",
+              properties: {
+                agent: { type: "string", enum: SPECIALIST_IDS },
+                goal: {
+                  type: "string",
+                  description: "Self-contained instruction, no references to the other tasks",
+                },
+              },
+              required: ["agent", "goal"],
+            },
+          },
+        },
+        required: ["tasks"],
+      },
+    },
+  },
+
   {
     type: "function",
     function: {
@@ -195,6 +231,13 @@ function toolLabel(name: string, args: any): string {
       return String(args?.url ?? "").slice(0, 160);
     case "delegate_agent":
       return `${args?.agent ?? "agent"}: ${String(args?.goal ?? "").slice(0, 100)}`;
+    case "delegate_team":
+      return (Array.isArray(args?.tasks) ? args.tasks : [])
+        .map((task: any) => String(task?.agent ?? ""))
+        .filter(Boolean)
+        .join(" + ")
+        .slice(0, 120);
+
     case "write_todo":
       return `${Array.isArray(args?.items) ? args.items.length : 0} steps`;
     default:
@@ -312,6 +355,41 @@ export async function runPrimaryAgent(opts: {
         briefs.push(`### ${profile.label} — ${goal}\n${brief}`);
         return brief.slice(0, 4000);
       }
+      case "delegate_team": {
+        const tasks = (Array.isArray(args?.tasks) ? args.tasks : [])
+          .map((task: any) => ({
+            id: String(task?.agent ?? "").trim().toLowerCase(),
+            goal: String(task?.goal ?? "").trim(),
+          }))
+          .filter((task: any) => AGENTS[task.id] && task.goal)
+          .slice(0, 4);
+        if (!tasks.length) return "no valid assignments";
+        const context = evidence.join("\n\n");
+        // Real parallel fan-out: every worker runs at the same time.
+        const reports = await Promise.all(tasks.map(async (task: any) => {
+          const profile = AGENTS[task.id];
+          try {
+            const brief = await runSpecialist(raw, profile, task.goal, context);
+            return { label: profile.label, id: task.id, goal: task.goal, brief };
+          } catch (error) {
+            return {
+              label: profile.label,
+              id: task.id,
+              goal: task.goal,
+              brief: `failed: ${error instanceof Error ? error.message : "error"}`,
+            };
+          }
+        }));
+        const lines: string[] = [];
+        for (const report of reports) {
+          if (!report.brief) continue;
+          used.add(report.id);
+          briefs.push(`### ${report.label} — ${report.goal}\n${report.brief}`);
+          lines.push(`## REPORT from ${report.label} (${report.goal})\n${report.brief.slice(0, 2500)}`);
+        }
+        return lines.length ? lines.join("\n\n") : "no worker returned anything";
+      }
+
       case "scrape_page": {
         const url = String(args?.url ?? "").trim();
         const { scrapePage } = await import("../_shared/hyperTools.ts");
@@ -404,7 +482,7 @@ export async function runPrimaryAgent(opts: {
 
       // Independent calls in one step run in parallel — this is what makes the
       // loop feel like a team rather than a queue.
-      const outcomes = await Promise.all(calls.slice(0, 5).map(async (call: any) => {
+      const outcomes = await Promise.all(calls.slice(0, PARALLEL_LIMIT).map(async (call: any) => {
         const name = String(call?.function?.name ?? "");
         let args: any = {};
         try {
@@ -422,7 +500,7 @@ export async function runPrimaryAgent(opts: {
           output = `error: ${error instanceof Error ? error.message : "failed"}`;
         }
         send({ tool_event: { type: "tool_result", name, call_id: callId, target, ok } });
-        return { callId, output };
+        return { callId, output, name };
       }));
 
       for (const outcome of outcomes) {
@@ -432,7 +510,29 @@ export async function runPrimaryAgent(opts: {
           content: outcome.output.slice(0, 6000) || "(empty)",
         });
       }
+
+      // Manager review: recite the plan, force an explicit judgement on the
+      // worker reports, and push long work onto the durable background agent
+      // before the turn runs out of wall clock.
+      const leftMs = LOOP_BUDGET_MS - (Date.now() - started);
+      const gotReports = outcomes.some((outcome) =>
+        outcome.name === "delegate_agent" || outcome.name === "delegate_team"
+      );
+      messages.push({
+        role: "user",
+        content: [
+          `MANAGER REVIEW (step ${steps}/${MAX_STEPS}, ~${Math.max(0, Math.round(leftMs / 1000))}s left).`,
+          todo.length ? `Current plan:\n${todo.map((item, i) => `${i + 1}. ${item}`).join("\n")}` : "",
+          gotReports
+            ? "Judge each worker report now: accept it, re-dispatch a sharper goal, or send a reviewer to verify it. Do not accept unverified facts, numbers or code."
+            : "",
+          leftMs < 70_000
+            ? "You are almost out of time. If the goal is not reachable in this turn, call start_background_task with the full remaining goal so it keeps running, then stop."
+            : "Continue with the next tool calls, running independent work in parallel. Stop and write your notes only when the goal is actually met.",
+        ].filter(Boolean).join("\n\n"),
+      });
     }
+
   } catch (error) {
     console.error("chat-alibaba primary agent loop failed", error);
   }
