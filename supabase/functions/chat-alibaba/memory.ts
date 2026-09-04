@@ -17,20 +17,40 @@ const STOPWORDS = new Set([
   "عن", "الي", "إلى", "هو", "هي", "ما", "مع", "ان", "أن", "كان", "ده", "دي",
 ]);
 
-type MemoryRow = { kind: string; key: string; value: string; confidence: number };
+type MemoryRow = {
+  kind: string;
+  key: string;
+  value: string;
+  confidence: number;
+  updated_at?: string | null;
+};
 
 function tokens(text: string): string[] {
   return (text.toLowerCase().match(/[\p{L}\p{N}_]{3,}/gu) ?? []).filter((t) => !STOPWORDS.has(t));
 }
 
-function score(row: MemoryRow, wanted: Set<string>): number {
+function score(row: MemoryRow, wanted: Set<string>, question: string): number {
   const bag = new Set(tokens(`${row.key} ${row.value}`));
   let overlap = 0;
   for (const token of bag) if (wanted.has(token)) overlap += 1;
+  // Rare-term weighting: matching a long distinctive token means more than a
+  // short common one, so retrieval stays sharp as the memory store grows.
+  let weighted = 0;
+  for (const token of bag) if (wanted.has(token)) weighted += Math.min(1.5, token.length / 6);
   // Preferences and identity facts stay useful even without lexical overlap.
   const durable = /preference|identity|profile|style|constraint/i.test(row.kind) ? 1.2 : 0;
-  return overlap + durable + (row.confidence || 0) * 0.5;
+  // Direct key mention in the question is the strongest possible signal.
+  const keyHit = row.key && question.toLowerCase().includes(row.key.toLowerCase().replace(/[_-]/g, " "))
+    ? 1.5
+    : 0;
+  // Recency decay: a fact touched this week outranks a year-old duplicate.
+  const ageDays = row.updated_at
+    ? Math.max(0, (Date.now() - new Date(row.updated_at).getTime()) / 86_400_000)
+    : 90;
+  const recency = Math.exp(-ageDays / 120) * 0.8;
+  return overlap + weighted + durable + keyHit + recency + (row.confidence || 0) * 0.5;
 }
+
 
 /**
  * Global memory identity.
