@@ -18,7 +18,6 @@ interface Props {
   onNextIntro: () => void;
   onStartCreating: () => void;
   onGoogle: () => void;
-  onGitHub: () => void;
   onTelegram: () => void;
   onEmail: () => void;
   onBack: () => void;
