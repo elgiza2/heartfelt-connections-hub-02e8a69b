@@ -82,12 +82,9 @@ Deno.serve(async (req) => {
   const { data: seen } = await admin
     .from("payment_events")
     .select("id")
-    .eq("event_id", id)
+    .eq("polar_event_id", `dodo_${id}`)
     .maybeSingle();
   if (seen) return json({ ok: true, duplicate: true });
-  await admin.from("payment_events").insert({ event_id: id, provider: "dodo", payload: event }).catch?.(
-    () => {},
-  );
 
   const success = [
     "payment.succeeded",
@@ -121,17 +118,23 @@ Deno.serve(async (req) => {
     }
     if (plan) {
       await admin.from("profiles").update({ plan }).eq("id", userId);
-      await admin.from("subscriptions").upsert(
-        {
-          user_id: userId,
-          plan,
-          status: "active",
-          currency: "USD",
-          amount_cents: Math.round(Number(data?.total_amount ?? 0)),
-          current_period_end: data?.next_billing_date ?? null,
-        },
-        { onConflict: "user_id" },
-      );
+      const row = {
+        plan,
+        status: "active",
+        currency: "USD",
+        amount_cents: Math.round(Number(data?.total_amount ?? 0)),
+        current_period_end: data?.next_billing_date ?? null,
+      };
+      const { data: existing } = await admin
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (existing?.id) {
+        await admin.from("subscriptions").update(row).eq("id", existing.id);
+      } else {
+        await admin.from("subscriptions").insert({ user_id: userId, ...row });
+      }
     }
   }
 
@@ -139,6 +142,13 @@ Deno.serve(async (req) => {
     await admin.from("profiles").update({ plan: "free" }).eq("id", userId);
     await admin.from("subscriptions").update({ status: "cancelled" }).eq("user_id", userId);
   }
+
+  await admin.from("payment_events").insert({
+    user_id: userId || null,
+    event_type: type,
+    polar_event_id: `dodo_${id}`,
+    payload: event,
+  });
 
   return json({ ok: true });
 });
