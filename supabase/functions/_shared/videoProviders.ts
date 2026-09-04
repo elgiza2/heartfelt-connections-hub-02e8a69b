@@ -153,7 +153,7 @@ export async function renderfulVideoSubmit(opts: {
   lastFrame?: string;
 }): Promise<string> {
   const i2v = !!opts.image;
-  const model = i2v ? (RENDERFUL_I2V[opts.model] ?? opts.model) : opts.model;
+  const model = renderfulModelId(opts.model, i2v);
   const body: Record<string, unknown> = {
     type: i2v ? "image-to-video" : "text-to-video",
     model,
