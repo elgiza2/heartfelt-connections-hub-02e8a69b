@@ -124,7 +124,10 @@ Deno.serve(async (req) => {
   const { data: quota, error: quotaErr } = await admin.rpc("consume_video_quota", {
     _model: modelSlug,
     _unlimited: unlimited,
+    // The admin client has no auth.uid(), so the caller is passed explicitly.
+    _user_id: user.id,
   });
+
   if (quotaErr && !unlimited) {
     return json({ error: true, paywall: true, message: quotaErr.message || "Video quota check failed" }, 402);
   }
