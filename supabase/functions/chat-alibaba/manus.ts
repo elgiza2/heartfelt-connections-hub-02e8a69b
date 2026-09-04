@@ -32,6 +32,25 @@ const LOOP_BUDGET_MS = 240_000;
 /** Independent tool calls executed concurrently inside one step. */
 const PARALLEL_LIMIT = 8;
 
+/* ── Token governor ───────────────────────────────────────────────────────────
+ * The loop's cost is dominated by three things: the tool catalog re-sent every
+ * step, full tool outputs kept in the loop transcript, and a manager-review
+ * message after every single step. We keep the same capability but pay for it
+ * once: the full catalog is advertised only while the plan is being formed, the
+ * transcript carries trimmed tool output (the FULL text still goes to the
+ * evidence pack), older steps are compacted into a digest, and the manager only
+ * reviews when there is something to judge.
+ * ---------------------------------------------------------------------------*/
+/** Tool output kept inside the loop transcript (evidence keeps the full text). */
+const LOOP_TOOL_CAP = 1600;
+/** Steps that see the complete tool catalog; later steps see core + used. */
+const FULL_CATALOG_STEPS = 2;
+/** Transcript size that triggers compaction of the older steps. */
+const COMPACT_AFTER = 16;
+/** Steps kept verbatim after a compaction. */
+const KEEP_TAIL = 8;
+
+
 const SPECIALIST_IDS = Object.keys(AGENTS).filter((id) => id !== "general");
 
 const LOOP_SYSTEM = `You are MEGSY's lead agent — the MANAGER of a team of worker agents and real tools. You run an autonomous work loop before the final answer is written.
