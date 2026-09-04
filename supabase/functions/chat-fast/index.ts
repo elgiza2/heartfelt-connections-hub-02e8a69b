@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
   };
 
 
-  const result = await callModel(admin(), [MODELS.fast], payload);
+  const result = await callModel(admin(), [MODELS.fast], { ...payload, agentRole: "fast" });
   const upstream = result?.response ?? null;
 
   if (!upstream || !upstream.body) {

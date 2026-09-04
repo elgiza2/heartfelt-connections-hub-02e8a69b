@@ -31,6 +31,7 @@ import {
 
 async function completion(db: ReturnType<typeof admin>, system: string, user: string, maxTokens = 2000) {
   const result = await callModel(db, [MODELS.standard, MODELS.fast], {
+    agentRole: "manager",
     model: MODELS.standard,
     stream: false,
     temperature: 0.7,
