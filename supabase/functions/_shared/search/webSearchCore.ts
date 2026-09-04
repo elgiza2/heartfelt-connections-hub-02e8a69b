@@ -147,7 +147,13 @@ async function apiSearch(query: string, count: number): Promise<WebSearchResult[
     }
   }
 
-  const serper = Deno.env.get("SERPER_API_KEY")?.trim();
+  const serper = (
+    Deno.env.get("serper") ||
+    Deno.env.get("SERPER") ||
+    Deno.env.get("SERPER_API_KEY") ||
+    Deno.env.get("SERPER_KEY") ||
+    ""
+  ).trim();
   if (serper) {
     try {
       const resp = await fetch("https://google.serper.dev/search", {
