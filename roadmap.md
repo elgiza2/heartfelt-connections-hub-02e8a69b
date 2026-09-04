@@ -16,3 +16,6 @@
 - [x] Referral tiers + reward tasks seeded, UI reads them
 - [x] Test account created and saved to TEST_ACCOUNT.md, all services tested end-to-end
 - [ ] Web search needs one API key: BRAVE_API_KEY, TAVILY_API_KEY or SERPER_API_KEY (code paths ready)
+
+- [x] Serper search key: read env names `serper`/`SERPER`/`SERPER_API_KEY` in _shared/search/webSearchCore.ts
+- [ ] GLM model: not served by abliteration.ai (/v1/models = abliterated-model, -large, -large-v2). Needs a GLM provider key (z.ai) to switch.
