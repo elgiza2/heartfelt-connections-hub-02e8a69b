@@ -55,6 +55,9 @@ type RequestBody = {
   model?: string;
   tier?: string;
   customSystem?: string | null;
+  /** Same field, short name — this is what the web client actually sends. */
+  n?: string | null;
+
   searchEnabled?: boolean;
   resume_id?: string;
   maxTokens?: number;
