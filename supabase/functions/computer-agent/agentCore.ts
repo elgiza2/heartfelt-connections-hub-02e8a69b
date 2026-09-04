@@ -377,16 +377,41 @@ export async function handleComputerAgent(payload: ComputerPayload | null): Prom
         ? `Context from earlier in this conversation:\n${memory}\n\n---\nTask:\n${prompt}`
         : prompt;
 
-      const res = await callUpstream(supabase, {
+      // Browser Use rejects models that the account's plan does not include
+      // (403 "not available on the free plan"), so walk a candidate ladder
+      // starting from the configured model.
+      const llmCandidates = [
+        Deno.env.get("BROWSER_USE_LLM")?.trim() || undefined,
+        "gemini-2.5-flash-lite",
+        "llama-4-maverick-17b-128e-instruct",
+        "gpt-4.1-mini",
+        undefined,
+      ];
+      let res = await callUpstream(supabase, {
         path: "/tasks",
         method: "POST",
         body: {
           task: fullPrompt.slice(0, 50_000),
-          llm: Deno.env.get("BROWSER_USE_LLM") || undefined,
+          llm: llmCandidates[0],
           maxSteps: 100,
           vision: "auto",
         },
       });
+      for (let i = 1; i < llmCandidates.length && !res.ok; i += 1) {
+        if (!/not available on the/i.test((res as UpstreamFail).message ?? "")) break;
+        if (llmCandidates[i] === llmCandidates[0]) continue;
+        res = await callUpstream(supabase, {
+          path: "/tasks",
+          method: "POST",
+          body: {
+            task: fullPrompt.slice(0, 50_000),
+            llm: llmCandidates[i],
+            maxSteps: 100,
+            vision: "auto",
+          },
+        });
+      }
+
 
       if (!res.ok) {
         const fail = res as UpstreamFail;
