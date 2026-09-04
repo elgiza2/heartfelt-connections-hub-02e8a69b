@@ -9,7 +9,7 @@ export const DASHSCOPE_BASE = "https://dashscope-intl.aliyuncs.com/api/v1";
 
 // DeAPI catalogue slug -> live model + sampling defaults.
 export const DEAPI_VIDEO: Record<string, { api: string; steps: number; fps: number }> = {
-  "deapi-ltx-video": { api: "Ltxv_13B_0_9_8_Distilled_FP8", steps: 1, fps: 24 },
+  "deapi-ltx-video": { api: "Ltxv_13B_0_9_8_Distilled_FP8", steps: 1, fps: 30 },
 };
 
 // Renderful text-to-video slug -> image-to-video variant.
@@ -77,7 +77,8 @@ export async function deapiVideoSubmit(opts: {
   image?: string;
 }): Promise<string> {
   const [width, height] = deapiDims(opts.aspectRatio);
-  const fps = Math.max(8, Math.min(30, opts.fps || 24));
+  // DeAPI requires fps >= 30 and at most 120 frames (so up to 4 seconds).
+  const fps = 30;
   const frames = Math.max(24, Math.min(120, Math.round(opts.duration * fps)));
 
   let res: Response;
