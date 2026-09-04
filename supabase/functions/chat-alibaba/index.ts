@@ -326,17 +326,55 @@ Deno.serve(async (req) => {
           console.error("chat-alibaba memory recall skipped", error);
         }
 
+        // The instructions the person saved in Settings are binding for every
+        // turn — they used to be ignored because nothing read this table.
+        let personaBlock = "";
+        if (userId) {
+          try {
+            const { data: pers } = await admin
+              .from("ai_personalization")
+              .select("call_name, profession, about, ai_traits, custom_instructions, language_style")
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (pers) {
+              const lines = [
+                pers.call_name ? `Call the user: ${pers.call_name}` : "",
+                pers.profession ? `Their work: ${pers.profession}` : "",
+                pers.about ? `About them: ${pers.about}` : "",
+                pers.ai_traits ? `Personality they want from you: ${pers.ai_traits}` : "",
+                pers.language_style ? `Language / style: ${pers.language_style}` : "",
+                pers.custom_instructions ? `Standing instructions: ${pers.custom_instructions}` : "",
+              ].filter(Boolean);
+              if (lines.length) {
+                personaBlock = [
+                  "━━━━ USER SETTINGS (BINDING — FOLLOW EXACTLY, NEVER MENTION) ━━━━",
+                  ...lines,
+                ].join("\n");
+              }
+            }
+          } catch (error) {
+            console.error("chat-alibaba personalization skipped", error);
+          }
+        }
+
+        const clientSystem =
+          (typeof body.customSystem === "string" && body.customSystem) ||
+          (typeof body.n === "string" && body.n) ||
+          "";
+
         const system = [
           SYSTEM,
           memoryBlock,
           profileSystem(profile),
-          typeof body.customSystem === "string" ? body.customSystem : "",
+          personaBlock,
+          clientSystem,
           liveContext,
           agentContext,
           deliveryContract(turn),
         ]
           .filter(Boolean)
           .join("\n\n");
+
 
 
         const result: (ChatUpstream & { model?: string }) | null = await callAlibaba(admin, models, {
