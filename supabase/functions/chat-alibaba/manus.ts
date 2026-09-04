@@ -231,6 +231,13 @@ function toolLabel(name: string, args: any): string {
       return String(args?.url ?? "").slice(0, 160);
     case "delegate_agent":
       return `${args?.agent ?? "agent"}: ${String(args?.goal ?? "").slice(0, 100)}`;
+    case "delegate_team":
+      return (Array.isArray(args?.tasks) ? args.tasks : [])
+        .map((task: any) => String(task?.agent ?? ""))
+        .filter(Boolean)
+        .join(" + ")
+        .slice(0, 120);
+
     case "write_todo":
       return `${Array.isArray(args?.items) ? args.items.length : 0} steps`;
     default:
