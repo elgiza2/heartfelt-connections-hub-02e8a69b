@@ -327,7 +327,26 @@ export async function runPrimaryAgent(opts: {
     },
   ];
 
+  /* Web budget: the same query or page was being fetched several times in one
+   * turn, and each fetch also grows every later prompt. Repeats are answered
+   * from cache and the turn has a hard fetch ceiling. */
+  const webCache = new Map<string, string>();
+  let searches = 0;
+  let fetches = 0;
+  const MAX_SEARCHES = 8;
+  const MAX_FETCHES = 10;
+
   const exec = async (name: string, args: any): Promise<string> => {
+    const cacheKey = `${name}:${JSON.stringify(args ?? {})}`.slice(0, 400);
+    if (webCache.has(cacheKey)) return `(already fetched this turn)\n${webCache.get(cacheKey)}`;
+    if (name === "web_search" && searches >= MAX_SEARCHES) {
+      return "search budget for this turn is used up — work with the evidence already gathered";
+    }
+    if ((name === "open_url" || name === "scrape_page") && fetches >= MAX_FETCHES) {
+      return "page-fetch budget for this turn is used up — work with the evidence already gathered";
+    }
+    if (name === "web_search") searches += 1;
+    if (name === "open_url" || name === "scrape_page") fetches += 1;
     switch (name) {
       case "write_todo": {
         const items = Array.isArray(args?.items)
@@ -354,7 +373,9 @@ export async function runPrimaryAgent(opts: {
           lines.push(`- ${title} — ${url}\n  ${(item.description ?? "").replace(/<[^>]+>/g, "").slice(0, 240)}`);
         }
         send({ sources: sources.slice(0, 12) });
-        return lines.join("\n") || "no results";
+        const out = lines.join("\n") || "no results";
+        webCache.set(cacheKey, out);
+        return out;
       }
       case "open_url": {
         const url = String(args?.url ?? "").trim();
