@@ -336,7 +336,7 @@ export async function runPrimaryAgent(opts: {
   const MAX_SEARCHES = 8;
   const MAX_FETCHES = 10;
 
-  const exec = async (name: string, args: any): Promise<string> => {
+  const execTool = async (name: string, args: any): Promise<string> => {
     const cacheKey = `${name}:${JSON.stringify(args ?? {})}`.slice(0, 400);
     if (webCache.has(cacheKey)) return `(already fetched this turn)\n${webCache.get(cacheKey)}`;
     if (name === "web_search" && searches >= MAX_SEARCHES) {
@@ -493,6 +493,15 @@ export async function runPrimaryAgent(opts: {
         return "unknown tool";
       }
     }
+  };
+
+  /** Caches web reads so a repeated URL never costs a second fetch or prompt. */
+  const exec = async (name: string, args: any): Promise<string> => {
+    const output = await execTool(name, args);
+    if (name === "open_url" || name === "scrape_page") {
+      webCache.set(`${name}:${JSON.stringify(args ?? {})}`.slice(0, 400), output.slice(0, LOOP_TOOL_CAP));
+    }
+    return output;
   };
 
   /**
