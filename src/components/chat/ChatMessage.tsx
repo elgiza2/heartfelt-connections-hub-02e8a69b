@@ -1967,70 +1967,50 @@ const ChatMessage = ({
             {/* Optional artifact slot (e.g. docs/slides card) — rendered before action buttons */}
             {bottomSlot && !isStreaming && <div className="mt-3">{bottomSlot}</div>}
 
-            {/* Action buttons: like + copy + dislike only */}
+            {/* Action buttons: like + copy + dislike only — quiet, no shadows, no springy motion */}
             {!isStreaming && !hasRunningTool && content && !showSlidesInfoBox && !hideActions && (
-              <div className="flex items-center gap-1 mt-2">
-                <motion.button
+              <div className="flex items-center gap-0.5 mt-1.5">
+                <button
+                  type="button"
                   onClick={() => handleLikeAction(liked === true ? null : true)}
-                  className={`group p-1.5 rounded-xl transition-colors ${
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150 ${
                     liked === true
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                      ? "text-primary"
+                      : "text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5"
                   }`}
                   title="Like"
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 15 }}
                 >
-                  <motion.span
-                    whileTap={{ rotate: -18, scale: 1.25 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 12 }}
-                    className="block"
-                  >
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                  </motion.span>
-                </motion.button>
+                  <ThumbsUp className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                </button>
 
-                <motion.button
+                <button
+                  type="button"
                   onClick={handleCopy}
-                  className="group p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors duration-150"
                   title={copied ? "Copied" : "Copy"}
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 15 }}
                 >
-                  <motion.span
-                    whileTap={{ y: -2 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 12 }}
-                    className="block"
-                  >
-                    {copied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </motion.span>
-                </motion.button>
+                  {copied ? (
+                    <Check className="w-[15px] h-[15px] text-emerald-500" strokeWidth={1.75} />
+                  ) : (
+                    <Copy className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                  )}
+                </button>
 
-                <motion.button
+                <button
+                  type="button"
                   onClick={() => handleLikeAction(liked === false ? null : false)}
-                  className={`group p-1.5 rounded-xl transition-colors ${
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150 ${
                     liked === false
-                      ? "text-destructive bg-destructive/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                      ? "text-destructive"
+                      : "text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5"
                   }`}
                   title="Dislike"
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 15 }}
                 >
-                  <motion.span
-                    whileTap={{ rotate: 18, scale: 1.25 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 12 }}
-                    className="block"
-                  >
-                    <ThumbsDown className="w-3.5 h-3.5" />
-                  </motion.span>
-                </motion.button>
+                  <ThumbsDown className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                </button>
               </div>
             )}
+
             {!isStreaming && !hasRunningTool && content && (
               <ReactionsRow
                 reactions={reactions || []}
