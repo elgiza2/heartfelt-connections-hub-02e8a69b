@@ -272,6 +272,8 @@ async function runSpecialist(
   context: string,
 ): Promise<string> {
   const data = await raw(profile.models, {
+    // Per-agent model split at the provider (see _shared/cerebras.ts).
+    agentRole: profile.id,
     temperature: profile.temperature,
     max_tokens: 1500,
     messages: [
@@ -546,6 +548,7 @@ export async function runPrimaryAgent(opts: {
       compact();
 
       const data = await raw(LEAD_MODELS, {
+        agentRole: "manager",
         temperature: 0.25,
         max_tokens: 1100,
         parallel_tool_calls: true,
