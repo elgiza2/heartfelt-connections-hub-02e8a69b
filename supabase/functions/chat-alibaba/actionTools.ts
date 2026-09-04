@@ -545,7 +545,9 @@ export function actionLabel(name: string, args: any): string {
     case "build_and_deploy_app":
       return String(args?.name ?? args?.brief ?? "").slice(0, 100);
     case "computer_task":
+    case "start_background_task":
       return String(args?.goal ?? "").slice(0, 100);
+
     case "send_email":
       return String(args?.to ?? "").slice(0, 80);
     case "generate_image":
