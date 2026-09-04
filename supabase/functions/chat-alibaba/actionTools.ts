@@ -226,7 +226,39 @@ export const ACTION_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "start_background_task",
+      description:
+        "Hand a task that needs hours (or that must survive this chat turn) to the durable background agent. It checkpoints its own state and is resumed automatically by cron until the goal is done. Use it for long monitoring, large multi-phase builds, research marathons or anything you cannot finish inside this turn.",
+      parameters: {
+        type: "object",
+        properties: {
+          goal: {
+            type: "string",
+            description: "Complete, self-contained goal including success criteria and constraints.",
+          },
+          budget_ms: { type: "number", description: "Optional wall-clock budget in ms (default 24h)." },
+        },
+        required: ["goal"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "background_task_status",
+      description: "Read the state, progress and latest events of a durable background task.",
+      parameters: {
+        type: "object",
+        properties: { run_id: { type: "string" } },
+        required: ["run_id"],
+      },
+    },
+  },
 ];
+
 
 export const ACTION_TOOL_NAMES = new Set(ACTION_TOOLS.map((tool) => tool.function.name));
 
