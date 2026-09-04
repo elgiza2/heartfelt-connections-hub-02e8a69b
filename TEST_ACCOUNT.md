@@ -26,3 +26,7 @@
 | التكاملات (Pipedream) | ✅ Connect token |
 | الإحالة (tiers + reward tasks) | ✅ مزروعة وتُقرأ في الواجهة |
 | البحث على الويب | ⚠️ يحتاج مفتاح `BRAVE_API_KEY` أو `TAVILY_API_KEY` أو `SERPER_API_KEY` |
+
+## Agent deployment (Freestyle)
+- `build_and_deploy_app` verified end to end: https://bean-bar-jo9e4.style.dev (HTTP 200)
+- Sites are served from a Freestyle Ubuntu VM on port 3000 behind a free `*.style.dev` HTTPS domain.
