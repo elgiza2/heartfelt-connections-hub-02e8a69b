@@ -382,11 +382,12 @@ export async function handleComputerAgent(payload: ComputerPayload | null): Prom
       // starting from the configured model.
       const llmCandidates = [
         Deno.env.get("BROWSER_USE_LLM")?.trim() || undefined,
-        "gemini-2.5-flash-lite",
-        "llama-4-maverick-17b-128e-instruct",
-        "gpt-4.1-mini",
+        "browser-use-llm",
+        "bu-2-0-mini-preview",
+        "gemini-2.5-flash",
         undefined,
       ];
+
       let res = await callUpstream(supabase, {
         path: "/tasks",
         method: "POST",
