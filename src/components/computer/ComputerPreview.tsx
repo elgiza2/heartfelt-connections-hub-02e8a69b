@@ -4,6 +4,8 @@ import { useLongRun } from "@/hooks/useLongRun";
 import { clearActiveComputerRun, setActiveComputerRun } from "@/lib/computer/activeRun";
 import { cleanTrace, isInternalTraceLine } from "@/lib/computer/traceCleanup";
 import ThinkingTrace from "@/components/chat/ThinkingTrace";
+import ChatMessage from "@/components/chat/ChatMessage";
+
 import { Button } from "@/components/ui/button";
 
 
