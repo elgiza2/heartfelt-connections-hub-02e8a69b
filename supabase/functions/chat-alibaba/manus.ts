@@ -482,7 +482,7 @@ export async function runPrimaryAgent(opts: {
 
       // Independent calls in one step run in parallel — this is what makes the
       // loop feel like a team rather than a queue.
-      const outcomes = await Promise.all(calls.slice(0, 5).map(async (call: any) => {
+      const outcomes = await Promise.all(calls.slice(0, PARALLEL_LIMIT).map(async (call: any) => {
         const name = String(call?.function?.name ?? "");
         let args: any = {};
         try {
@@ -500,7 +500,7 @@ export async function runPrimaryAgent(opts: {
           output = `error: ${error instanceof Error ? error.message : "failed"}`;
         }
         send({ tool_event: { type: "tool_result", name, call_id: callId, target, ok } });
-        return { callId, output };
+        return { callId, output, name };
       }));
 
       for (const outcome of outcomes) {
@@ -510,7 +510,29 @@ export async function runPrimaryAgent(opts: {
           content: outcome.output.slice(0, 6000) || "(empty)",
         });
       }
+
+      // Manager review: recite the plan, force an explicit judgement on the
+      // worker reports, and push long work onto the durable background agent
+      // before the turn runs out of wall clock.
+      const leftMs = LOOP_BUDGET_MS - (Date.now() - started);
+      const gotReports = outcomes.some((outcome) =>
+        outcome.name === "delegate_agent" || outcome.name === "delegate_team"
+      );
+      messages.push({
+        role: "user",
+        content: [
+          `MANAGER REVIEW (step ${steps}/${MAX_STEPS}, ~${Math.max(0, Math.round(leftMs / 1000))}s left).`,
+          todo.length ? `Current plan:\n${todo.map((item, i) => `${i + 1}. ${item}`).join("\n")}` : "",
+          gotReports
+            ? "Judge each worker report now: accept it, re-dispatch a sharper goal, or send a reviewer to verify it. Do not accept unverified facts, numbers or code."
+            : "",
+          leftMs < 70_000
+            ? "You are almost out of time. If the goal is not reachable in this turn, call start_background_task with the full remaining goal so it keeps running, then stop."
+            : "Continue with the next tool calls, running independent work in parallel. Stop and write your notes only when the goal is actually met.",
+        ].filter(Boolean).join("\n\n"),
+      });
     }
+
   } catch (error) {
     console.error("chat-alibaba primary agent loop failed", error);
   }
