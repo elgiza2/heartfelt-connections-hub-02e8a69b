@@ -1701,41 +1701,27 @@ const ChatMessage = ({
             {/* Shopping product cards removed */}
 
             {hasProjectPreview && (
-              <div className="mb-3 flex flex-col sm:flex-row gap-2">
+              <div className="mb-3">
                 <button
                   type="button"
                   onClick={openProjectPreview}
-                  className="group inline-flex items-center gap-3 flex-1 rounded-2xl border border-border/60 bg-gradient-to-br from-surface-1 to-surface-3 px-4 py-3 text-left shadow-sm hover:shadow-md hover:border-[var(--megsy-blue)]/60 transition-all"
+                  className="group inline-flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 text-left transition-colors hover:border-[var(--megsy-blue)]/50"
                 >
-                  <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--megsy-blue)]/20 text-[var(--megsy-blue)] group-hover:bg-[var(--megsy-blue)] group-hover:text-foreground transition-colors">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--megsy-blue)]/15 text-[var(--megsy-blue)]">
                     <Play className="w-4 h-4" fill="currentColor" />
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-foreground">
+                    <span className="block text-[13px] font-semibold text-foreground">
                       Project preview
                     </span>
-                    <span className="block text-[11px] text-foreground/60 truncate">
-                      {projectFiles.length} files · Click to run and browse
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStudioOpen(true)}
-                  className="group inline-flex items-center gap-3 flex-1 rounded-2xl border border-border/60 bg-gradient-to-br from-surface-1 to-surface-3 px-4 py-3 text-left shadow-sm hover:shadow-md hover:border-emerald-400/60 transition-all"
-                >
-                  <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-background transition-colors">
-                    <FolderTree className="w-4 h-4" />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-foreground">Files</span>
-                    <span className="block text-[11px] text-foreground/60 truncate">
-                      {projectFiles.length} files · Browse and edit
+                    <span className="block text-[11px] text-muted-foreground truncate">
+                      {projectFiles.length} files
                     </span>
                   </span>
                 </button>
               </div>
             )}
+
 
 
 
