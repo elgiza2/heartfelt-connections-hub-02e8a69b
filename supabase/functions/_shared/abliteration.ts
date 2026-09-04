@@ -1,16 +1,20 @@
 /**
- * The project's ONLY text-model provider: abliteration.ai.
+ * Text-model routing.
  *
- * OpenAI-compatible surface (`https://api.abliteration.ai/v1/chat/completions`),
- * so every existing caller keeps its payload/SSE contract. Keys come from the
- * `abliteration_keys` table (admin-managed, rotatable) and, as a bootstrap
- * fallback, from a function secret.
+ * PRIMARY provider: Cerebras (see `cerebras.ts`) — every agent role gets its own
+ * model (qwen-3.8-27b for workers/chat, gpt-oss-120b for manager/planner/final,
+ * gemma-4-31b for the cheap lane). Pass `agentRole` in the payload to pick one.
+ * FALLBACK provider: abliteration.ai (OpenAI-compatible), keys from the
+ * rotatable `abliteration_keys` table and a function secret.
  *
- * No other chat provider is used anywhere in this codebase: browsing/computer
- * work goes to Browser Use Cloud (see `cloudAgents.ts`).
+ * Both surfaces are OpenAI-compatible, so every existing caller keeps its
+ * payload/SSE contract. Browsing/computer work goes to Browser Use Cloud
+ * (see `cloudAgents.ts`).
  */
+import { callCerebras } from "./cerebras.ts";
 
 const BASE = Deno.env.get("ABLITERATION_API_BASE") || "https://api.abliteration.ai/v1";
+
 
 /** Model ladder, strongest first for heavy turns, `fast` for the fast lane. */
 export const MODELS = {
