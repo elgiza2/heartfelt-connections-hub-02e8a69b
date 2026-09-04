@@ -26,9 +26,12 @@ export type Frame = (frame: Record<string, unknown>) => void;
 
 /** Lead-agent model ladder: strongest first, cheap flash last as a rescue. */
 const LEAD_MODELS = ["qwen3.8-max", "qwen3.7-max", "qwen-max", "qwen-plus"];
-const MAX_STEPS = 12;
+const MAX_STEPS = 20;
 /** Hard wall-clock budget for the whole loop, so a turn never hangs. */
 const LOOP_BUDGET_MS = 240_000;
+/** Independent tool calls executed concurrently inside one step. */
+const PARALLEL_LIMIT = 8;
+
 const SPECIALIST_IDS = Object.keys(AGENTS).filter((id) => id !== "general");
 
 const LOOP_SYSTEM = `You are MEGSY's lead agent, running an autonomous work loop before the final answer is written.
