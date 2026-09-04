@@ -241,20 +241,25 @@ async function writeSite(
   ctx: ActionCtx,
   brief: string,
 ): Promise<{ path: string; content: string }[]> {
-  const data = await ctx.raw(["qwen3.8-max", "qwen3.7-max", "qwen-max", "qwen-plus"], {
-    temperature: 0.4,
-    max_tokens: 12000,
-    messages: [
-      {
-        role: "system",
-        content: `You are a senior front-end engineer shipping production sites.
+  const system = `You are a senior front-end engineer shipping production sites.
 Return ONE complete HTML document and NOTHING else: no commentary, no markdown fences.
-Requirements: start at <!DOCTYPE html>, inline all CSS and JS, no build step and no local assets. Tailwind via CDN, Google Fonts and CDN React are allowed. Fully responsive, accessible, real finished copy (never lorem ipsum or TODOs), and a considered visual identity that matches the brief.`,
-      },
-      { role: "user", content: brief.slice(0, 8000) },
-    ],
-  });
-  let text = String(data?.choices?.[0]?.message?.content ?? "").trim();
+Requirements: start at <!DOCTYPE html>, inline all CSS and JS, no build step and no local assets. Tailwind via CDN and Google Fonts are allowed. Responsive, accessible, real finished copy (never lorem ipsum or TODOs), and a considered visual identity that matches the brief. Keep it under 400 lines.`;
+  // Some upstream models reject very large max_tokens outright, so the budget
+  // walks down until one call actually returns a document.
+  let text = "";
+  for (const budget of [6000, 3000, 2000]) {
+    const data = await ctx.raw(["qwen3.8-max", "qwen-max", "qwen-plus"], {
+      temperature: 0.4,
+      max_tokens: budget,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: brief.slice(0, 6000) },
+      ],
+    });
+    text = String(data?.choices?.[0]?.message?.content ?? "").trim();
+    console.log(`build_and_deploy_app: coder budget ${budget} returned ${text.length} chars`);
+    if (text.length > 200) break;
+  }
   const fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
   if (fence) text = fence[1].trim();
   const start = text.search(/<!DOCTYPE html|<html[\s>]/i);
@@ -279,17 +284,27 @@ export async function runActionTool(
       if (!files.some((file) => /^\.?\/?index\.html$/i.test(file.path))) {
         files = await writeSite(ctx, brief || "A simple one-page site");
       }
-      if (!files.length) return "the coder produced no files — retry with a clearer brief";
+      if (!files.length) {
+        console.error("build_and_deploy_app: no deployable HTML produced");
+        return "the coder produced no HTML — retry with a clearer, shorter brief";
+      }
       const slug = String(args?.name ?? "app")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
         .slice(0, 24) || "app";
       const subdomain = `${slug}-${Math.random().toString(36).slice(2, 7)}`;
-      const result = await deployStaticSite(ctx.admin, files, {
-        subdomain,
-        displayName: `megsy-${slug}`,
-      });
+      let result;
+      try {
+        result = await deployStaticSite(ctx.admin, files, {
+          subdomain,
+          displayName: `megsy-${slug}`,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("build_and_deploy_app: deploy failed", message);
+        return `deploy failed: ${message}`;
+      }
       ctx.send({ site_build: { url: result.url, files: result.files } });
       if (ctx.userId) {
         await ctx.admin
