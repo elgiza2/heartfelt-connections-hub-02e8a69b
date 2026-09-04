@@ -15,7 +15,11 @@ import {
   type ComputerEvent,
 } from "@/lib/computer/client";
 import ThinkingTrace from "@/components/chat/ThinkingTrace";
+import ChatMessage from "@/components/chat/ChatMessage";
+
 import { clearActiveComputerRun, setActiveComputerRun } from "@/lib/computer/activeRun";
+import { cleanTrace } from "@/lib/computer/traceCleanup";
+
 
 interface Props {
   taskId: string;
@@ -67,11 +71,13 @@ export default function ComputerTaskCard({ taskId }: Props) {
 
   const running = !timedOut && (!task || task.status === "pending" || task.status === "running");
   const files = task?.files ?? [];
-  const traceSteps = useMemo(() => events.map((event) => event.title).filter(Boolean), [events]);
+  // Internal bookkeeping (checkpoints, raw errors, JSON) never reaches the chat.
+  const traceSteps = useMemo(() => cleanTrace(events.map((event) => event.title)), [events]);
   const traceText = useMemo(
-    () => events.map((event) => event.detail).filter((value): value is string => !!value).join("\n\n"),
+    () => cleanTrace(events.map((event) => event.detail)).join("\n\n"),
     [events],
   );
+
   const liveUrl = task?.live_url ? `${task.live_url}${task.live_url.includes("?") ? "&" : "?"}view_only=true` : null;
 
   if (running) {
@@ -116,11 +122,8 @@ export default function ComputerTaskCard({ taskId }: Props) {
 
   return (
     <div className="my-1">
-      {task?.result_text && (
-        <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-foreground/90">
-          {task.result_text}
-        </p>
-      )}
+      {task?.result_text && <ChatMessage role="assistant" content={task.result_text} />}
+
 
       {files.length > 0 && (
         <div className="mt-2 space-y-2">

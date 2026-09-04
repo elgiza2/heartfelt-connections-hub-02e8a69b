@@ -4,6 +4,8 @@ import { useLongRun } from "@/hooks/useLongRun";
 import { clearActiveComputerRun, setActiveComputerRun } from "@/lib/computer/activeRun";
 import { cleanTrace, isInternalTraceLine } from "@/lib/computer/traceCleanup";
 import ThinkingTrace from "@/components/chat/ThinkingTrace";
+import ChatMessage from "@/components/chat/ChatMessage";
+
 import { Button } from "@/components/ui/button";
 
 
@@ -256,12 +258,12 @@ export function ComputerPreview({
       )}
 
 
-      {/* final answer, plain text */}
+      {/* final answer — rendered exactly like a normal assistant message
+          (markdown, headings, lists, code, copy/like actions). */}
       {finished && finalText && (
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
-          {finalText}
-        </p>
+        <ChatMessage role="assistant" content={finalText} />
       )}
+
 
       {onClose && (
         <button

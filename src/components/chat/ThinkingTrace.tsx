@@ -161,15 +161,19 @@ const ThinkingTrace = ({
       </button>
 
       {open && (
-        <div className="mt-1.5 max-h-80 overflow-y-auto">
-          <div className="border-s border-border/40 ps-3 flex flex-col gap-2">
+        <div className="mt-2 max-h-80 overflow-y-auto">
+          <div className="flex flex-col gap-2.5 border-s border-border/40 ps-3">
             {hasBody ? (
               lines.map((line, i) => (
                 <div
                   key={`${i}-${line.slice(0, 24)}`}
-                  className="text-[12.5px] leading-relaxed text-muted-foreground whitespace-pre-wrap"
+                  className="flex items-start gap-2 text-[12.5px] leading-relaxed text-muted-foreground"
                 >
-                  {line}
+                  <span
+                    aria-hidden
+                    className="mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full bg-border"
+                  />
+                  <span className="min-w-0 whitespace-pre-wrap break-words">{line}</span>
                 </div>
               ))
             ) : (
@@ -180,6 +184,7 @@ const ThinkingTrace = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };

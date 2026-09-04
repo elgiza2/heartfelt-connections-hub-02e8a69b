@@ -72,7 +72,7 @@ export default function MobileModeBar({ mode, onChange }: Props) {
     <div
       data-testid="mobile-mode-bar"
       dir="ltr"
-      className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2.5 min-h-[40px] chips-edge-fade"
+      className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 pb-2.5 min-h-[40px]"
       style={{ WebkitOverflowScrolling: "touch", scrollSnapType: "x proximity" }}
 
 
@@ -136,15 +136,9 @@ export default function MobileModeBar({ mode, onChange }: Props) {
               transition={{ ...TAP_SPRING, delay: i * 0.02 }}
               style={{
                 scrollSnapAlign: "start",
-                backgroundColor: "hsl(var(--brand-parchment) / 0.1)",
-                color: "hsl(var(--brand-parchment))",
-                border: `1px solid hsl(var(--brand-parchment) / 0.2)`,
-                backdropFilter: "blur(16px) saturate(170%)",
-                WebkitBackdropFilter: "blur(16px) saturate(170%)",
-                boxShadow: `inset 1px 1px 1px 0 hsl(var(--brand-parchment) / 0.18), 0 8px 20px hsl(0 0% 0% / 0.22)`,
                 fontWeight: 600,
               }}
-              className="shrink-0 inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full text-[13px] transition-all active:scale-95"
+              className="shrink-0 inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full border border-border/60 bg-card text-[13px] text-foreground/85 shadow-[0_2px_8px_hsl(var(--foreground)/0.07)] transition-all active:scale-95"
             >
               <Icon size={14} strokeWidth={2.4} style={{ color }} />
               <span className="leading-none whitespace-nowrap">{tx(label)}</span>

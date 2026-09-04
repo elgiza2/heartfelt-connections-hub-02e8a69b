@@ -109,14 +109,15 @@ const HIDDEN_VIDEO_MODEL_IDS = new Set([
 ]);
 
 const PREFERRED_VIDEO_MODEL_IDS = [
-  "seedance-2-5",
-  "wan-t2v-turbo",
-  "wan-t2v-plus",
-  "wan-i2v-flash",
-  "happyhorse-t2v",
-  "happyhorse-i2v",
-  "happyhorse-r2v",
+  "deapi-ltx-video",
+  "renderful-google-veo-3.1",
+  "renderful-sora-2",
+  "renderful-seedance-2.0",
+  "renderful-kling-3.0-turbo",
+  "renderful-google-veo-3.1-fast",
+  "renderful-wan-2.6",
 ];
+
 
 
 const PROVIDER_ORDER = [
@@ -403,9 +404,9 @@ function alibabaRowToModelDetail(r: any): ModelDetail {
   } as ModelDetail;
 }
 
-const MODELS_CACHE_KEY = "megsy_cache_dynamic_models_v6";
+const MODELS_CACHE_KEY = "megsy_cache_dynamic_models_v7";
 const MODELS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h — admin-managed, rarely changes
-const MODEL_SOURCE_VERSION = "verified-live-v6";
+const MODEL_SOURCE_VERSION = "verified-live-v7";
 
 function readCachedModels(): ModelDetail[] | null {
   try {
