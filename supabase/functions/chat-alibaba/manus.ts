@@ -348,6 +348,41 @@ export async function runPrimaryAgent(opts: {
         briefs.push(`### ${profile.label} — ${goal}\n${brief}`);
         return brief.slice(0, 4000);
       }
+      case "delegate_team": {
+        const tasks = (Array.isArray(args?.tasks) ? args.tasks : [])
+          .map((task: any) => ({
+            id: String(task?.agent ?? "").trim().toLowerCase(),
+            goal: String(task?.goal ?? "").trim(),
+          }))
+          .filter((task: any) => AGENTS[task.id] && task.goal)
+          .slice(0, 4);
+        if (!tasks.length) return "no valid assignments";
+        const context = evidence.join("\n\n");
+        // Real parallel fan-out: every worker runs at the same time.
+        const reports = await Promise.all(tasks.map(async (task: any) => {
+          const profile = AGENTS[task.id];
+          try {
+            const brief = await runSpecialist(raw, profile, task.goal, context);
+            return { label: profile.label, id: task.id, goal: task.goal, brief };
+          } catch (error) {
+            return {
+              label: profile.label,
+              id: task.id,
+              goal: task.goal,
+              brief: `failed: ${error instanceof Error ? error.message : "error"}`,
+            };
+          }
+        }));
+        const lines: string[] = [];
+        for (const report of reports) {
+          if (!report.brief) continue;
+          used.add(report.id);
+          briefs.push(`### ${report.label} — ${report.goal}\n${report.brief}`);
+          lines.push(`## REPORT from ${report.label} (${report.goal})\n${report.brief.slice(0, 2500)}`);
+        }
+        return lines.length ? lines.join("\n\n") : "no worker returned anything";
+      }
+
       case "scrape_page": {
         const url = String(args?.url ?? "").trim();
         const { scrapePage } = await import("../_shared/hyperTools.ts");
