@@ -230,34 +230,36 @@ export const ACTION_TOOLS = [
 
 export const ACTION_TOOL_NAMES = new Set(ACTION_TOOLS.map((tool) => tool.function.name));
 
-/** Asks the coder ladder for a deployable static bundle. */
+/**
+ * Asks the coder ladder for a deployable bundle.
+ *
+ * A single complete HTML document is requested as raw text (not JSON): models
+ * produce far more reliable output that way, and JSON escaping of a full page
+ * is the main source of unusable replies.
+ */
 async function writeSite(
   ctx: ActionCtx,
   brief: string,
 ): Promise<{ path: string; content: string }[]> {
   const data = await ctx.raw(["qwen3.8-max", "qwen3.7-max", "qwen-max", "qwen-plus"], {
-    temperature: 0.3,
-    max_tokens: 8000,
+    temperature: 0.4,
+    max_tokens: 12000,
     messages: [
       {
         role: "system",
-        content: `You are a senior front-end engineer. Return ONLY a JSON object of the form {"files":[{"path":"index.html","content":"..."}]}.
-Rules: static files only, no build step, no node_modules. A root index.html is required. You may use CDN Tailwind, CDN React (with Babel) and Google Fonts. Ship a complete, polished, responsive, production-looking result with real content — never placeholders or lorem ipsum. Max 6 files.`,
+        content: `You are a senior front-end engineer shipping production sites.
+Return ONE complete HTML document and NOTHING else: no commentary, no markdown fences.
+Requirements: start at <!DOCTYPE html>, inline all CSS and JS, no build step and no local assets. Tailwind via CDN, Google Fonts and CDN React are allowed. Fully responsive, accessible, real finished copy (never lorem ipsum or TODOs), and a considered visual identity that matches the brief.`,
       },
       { role: "user", content: brief.slice(0, 8000) },
     ],
   });
-  const text = String(data?.choices?.[0]?.message?.content ?? "");
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return [];
-  try {
-    const parsed = JSON.parse(match[0]) as { files?: { path?: string; content?: string }[] };
-    return (parsed.files ?? [])
-      .filter((file) => file?.path && typeof file.content === "string")
-      .map((file) => ({ path: String(file.path), content: String(file.content) }));
-  } catch {
-    return [];
-  }
+  let text = String(data?.choices?.[0]?.message?.content ?? "").trim();
+  const fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  if (fence) text = fence[1].trim();
+  const start = text.search(/<!DOCTYPE html|<html[\s>]/i);
+  if (start < 0) return [];
+  return [{ path: "index.html", content: text.slice(start) }];
 }
 
 /** Runs one execution tool. Returns the text the lead agent sees. */
