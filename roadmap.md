@@ -3,12 +3,16 @@
 - [x] Copy full project from GitHub repo
 - [x] Telegram media storage schema (storage only — no bot/tasks features)
 - [x] Storage buckets + policies
-- [x] Keys stored: Browser Use, Pipedream (client id/secret), Kashier, Telegram bot + storage chat, Plus AI (slides)
+- [x] Keys stored: Browser Use, Pipedream (client id/secret + project id), Kashier, Telegram bot + storage chat, Plus AI (slides)
 - [x] Remove "Continue with GitHub" sign-in (GitHub token is for the coding agent only)
-- [x] Keys stored: PIPEDREAM_PROJECT_ID, DODO_PAYMENTS_API_KEY, DEAPI_API_KEY, RENDERFUL_API_KEY
-- [ ] Missing: DODO_WEBHOOK_SECRET (from Dodo dashboard webhook)
-- [x] Dodo Payments checkout + webhook edge functions (global) alongside Kashier (Arabic users)
-- [ ] Add Dodo product IDs to dodo_products table per plan tier
-- [ ] Wire DeAPI + Renderful for image/video generation
-- [ ] Wire Plus AI into slides generation
-- [ ] Create a test account, save credentials to a file, test end-to-end
+- [x] Keys stored: DODO_PAYMENTS_API_KEY, DODO_WEBHOOK_SECRET, DEAPI_API_KEY, RENDERFUL_API_KEY
+- [x] Dodo checkout + signed webhook (global) alongside Kashier (Arabic users)
+- [x] Dodo product IDs mapped in dodo_products (monthly / monthly_intro / monthly_winback / yearly / yearly_winback)
+- [x] Video quota: video_quota_usage + plan-aware consume_video_quota (Free 3 / Pro 40 / Elite 120)
+- [x] DeAPI + Renderful wired for images (anything-api) and video (media-video / media-video-poll)
+- [x] Plus AI slides pipeline verified (chat-slides-stream → background_jobs → done)
+- [x] Browser Use computer agent with model fallback ladder
+- [x] Coding agent (kimi-coder) SSE + skills import (import-skill)
+- [x] Referral tiers + reward tasks seeded, UI reads them
+- [x] Test account created and saved to TEST_ACCOUNT.md, all services tested end-to-end
+- [ ] Web search needs one API key: BRAVE_API_KEY, TAVILY_API_KEY or SERPER_API_KEY (code paths ready)
