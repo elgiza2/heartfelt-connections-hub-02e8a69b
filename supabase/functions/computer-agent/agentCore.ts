@@ -251,7 +251,9 @@ async function callUpstream(
         return { ok: true, data, key };
       }
       const message = String(data?.error?.message || data?.message || data?.error || text || "").slice(0, 300);
+      console.error(`browser-use ${call.method} ${call.path} -> ${resp.status}: ${message}`);
       const retryAfter = Number(resp.headers.get("retry-after") || "") || undefined;
+
       await markFailure(supabase, key, resp.status, message, retryAfter);
       last = { ok: false, status: resp.status, message };
       // Bad request / validation errors are our fault — rotating keys won't help.
