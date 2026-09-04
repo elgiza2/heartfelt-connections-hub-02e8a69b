@@ -499,8 +499,43 @@ export async function runActionTool(
       return `SKILL ${hit.name}\n${(hit.instructions || hit.body || "").slice(0, 6000)}`;
     }
 
+    case "start_background_task": {
+      const goal = String(args?.goal ?? "").trim();
+      if (!goal) return "empty goal";
+      if (!ctx.authToken) return "no signed-in user, cannot start a durable task";
+      const data = await callFunction(ctx, "long-run", {
+        action: "start",
+        token: ctx.authToken,
+        goal,
+        budget_ms: Number(args?.budget_ms) || undefined,
+      });
+      const runId = String(data?.run?.id ?? data?.run_id ?? data?.id ?? "");
+      if (!runId) return `could not start: ${data?.error ?? "unknown error"}`;
+      ctx.send({ long_run_id: runId });
+      return `durable background task ${runId} started and will keep running (and auto-resume) until the goal is done. Tell the user it is running in the background and that you will report back.`;
+    }
+
+    case "background_task_status": {
+      const runId = String(args?.run_id ?? "").trim();
+      if (!runId || !ctx.authToken) return "missing run_id or session";
+      const data = await callFunction(ctx, "long-run", {
+        action: "status",
+        token: ctx.authToken,
+        run_id: runId,
+      });
+      const run = data?.run ?? {};
+      const events = Array.isArray(data?.events) ? data.events.slice(-8) : [];
+      return JSON.stringify({
+        status: run.status,
+        step: run.step_index ?? run.steps,
+        summary: run.summary ?? run.last_summary,
+        events,
+      }).slice(0, 4000);
+    }
+
     default:
       return "unknown tool";
+
   }
 }
 
