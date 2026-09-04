@@ -560,20 +560,25 @@ export async function runPrimaryAgent(opts: {
       }));
 
       for (const outcome of outcomes) {
+        usedTools.add(outcome.name);
         messages.push({
           role: "tool",
           tool_call_id: outcome.callId,
-          content: outcome.output.slice(0, 6000) || "(empty)",
+          // Trimmed for the transcript only — the full output is already in the
+          // evidence pack that the final answer reads.
+          content: outcome.output.slice(0, LOOP_TOOL_CAP) || "(empty)",
         });
       }
 
-      // Manager review: recite the plan, force an explicit judgement on the
-      // worker reports, and push long work onto the durable background agent
-      // before the turn runs out of wall clock.
+      // Manager review: only when there is something to judge, on a periodic
+      // checkpoint, or when the clock is running out — reviewing after every
+      // single step doubled the prompt for no added quality.
       const leftMs = LOOP_BUDGET_MS - (Date.now() - started);
       const gotReports = outcomes.some((outcome) =>
         outcome.name === "delegate_agent" || outcome.name === "delegate_team"
       );
+      const lowTime = leftMs < 70_000;
+      if (!gotReports && !lowTime && steps % 3 !== 0) continue;
       messages.push({
         role: "user",
         content: [
@@ -582,7 +587,8 @@ export async function runPrimaryAgent(opts: {
           gotReports
             ? "Judge each worker report now: accept it, re-dispatch a sharper goal, or send a reviewer to verify it. Do not accept unverified facts, numbers or code."
             : "",
-          leftMs < 70_000
+          lowTime
+
             ? "You are almost out of time. If the goal is not reachable in this turn, call start_background_task with the full remaining goal so it keeps running, then stop."
             : "Continue with the next tool calls, running independent work in parallel. Stop and write your notes only when the goal is actually met.",
         ].filter(Boolean).join("\n\n"),
