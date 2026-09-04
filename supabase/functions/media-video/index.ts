@@ -13,6 +13,13 @@
  *   { error: true, message }
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  DEAPI_VIDEO,
+  deapiVideoSubmit,
+  normalizeVideoSlug,
+  providerForSlug,
+  renderfulVideoSubmit,
+} from "../_shared/videoProviders.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -192,9 +199,9 @@ Deno.serve(async (req) => {
       .insert({
         user_id: user.id,
         provider,
-        model_slug: modelSlug,
+        model_slug: slug,
         generation_id: generationId,
-        api_key_id: acquired.keyId,
+        api_key_id: apiKeyId,
         credits_charged: 0,
         prompt,
         duration_seconds: duration,
@@ -207,16 +214,16 @@ Deno.serve(async (req) => {
     if (jobErr) throw new Error(jobErr.message);
 
     void admin.from("media_generation_log").insert({
-      key_id: acquired.keyId,
+      key_id: apiKeyId,
       provider,
-      model_id: modelSlug,
+      model_id: slug,
       user_id: user.id,
       kind: "video",
       status: "started",
       duration_ms: Date.now() - startedAt,
     });
 
-    return json({ job_id: jobRow.id, provider, model_slug: modelSlug });
+    return json({ job_id: jobRow.id, provider, model_slug: slug });
   } catch (e) {
     const message = e instanceof Error ? e.message : "video generation failed";
     void admin.from("media_generation_log").insert({
