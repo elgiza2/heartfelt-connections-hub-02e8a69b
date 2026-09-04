@@ -200,11 +200,18 @@ Deno.serve(async (req) => {
   // Short, single-intent turns skip the planner round-trip entirely: keyword
   // routing is already right for them and the saved call is ~1-3 seconds off
   // the time-to-first-token.
+  // Anything that asks the agent to DO something (build/deploy, email, browse a
+  // computer, generate media, use an integration or a skill) always goes through
+  // the full tool loop, no matter how short the sentence is.
+  const ACTION_INTENT =
+    /(?:ابن|ابني|اعمل|اعملي|انشئ|أنشئ|صمم|صممي|انشر|إنشر|ارفع|ابعت|ابعتي|ارسل|أرسل|ايميل|إيميل|بريد|فيديو|صور[ةه]?|شرائح|بريزنتيشن|عرض تقديمي|حجز|احجز|اشتري|سجل لي|موقع|تطبيق|لاندينج|deploy|publish|host|build me|make me|create (?:a |an )?(?:site|website|app|page|landing|game|dashboard|tool)|landing page|website|web app|send (?:an )?email|e-?mail|inbox|generate (?:an )?(?:image|video)|slide|deck|presentation|book (?:a|me)|buy|log ?in to|browse|automate|integration|zapier|pipedream|mcp|skill)/i;
   const trivialTurn = !body.agent?.trim() &&
     question.length <= 240 &&
     !/\n/.test(question.trim()) &&
+    !ACTION_INTENT.test(question) &&
     !/(?:خطة|خطه|قارن|حلل|تقرير|دراسة|ثم|بعدين|plan|compare|analy[sz]e|report|research|refactor|step by step|and then)/i
       .test(question);
+
 
   // The pre-work (semantic plan → research pre-pass → parallel specialists →
   // upstream connect) can take tens of seconds. We therefore open the SSE
@@ -287,6 +294,7 @@ Deno.serve(async (req) => {
               send: (frame) => send(frame),
               userId,
               forcedAgent: body.agent?.trim() || undefined,
+              authToken: bearer || null,
             });
             agentContext = run.context;
           } catch (error) {
