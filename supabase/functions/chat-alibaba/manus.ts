@@ -120,6 +120,36 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "delegate_team",
+      description:
+        "Dispatch 2-4 specialist workers AT THE SAME TIME on independent subtasks and get all of their reports back in one result. Prefer this whenever the work splits into parts that do not depend on each other.",
+      parameters: {
+        type: "object",
+        properties: {
+          tasks: {
+            type: "array",
+            description: "2-4 independent assignments.",
+            items: {
+              type: "object",
+              properties: {
+                agent: { type: "string", enum: SPECIALIST_IDS },
+                goal: {
+                  type: "string",
+                  description: "Self-contained instruction, no references to the other tasks",
+                },
+              },
+              required: ["agent", "goal"],
+            },
+          },
+        },
+        required: ["tasks"],
+      },
+    },
+  },
+
+  {
+    type: "function",
+    function: {
       name: "scrape_page",
       description:
         "Render a URL in a real cloud browser and return clean markdown. Use for pages that plain fetching cannot read (JS apps, anti-bot, paywalled layout).",
