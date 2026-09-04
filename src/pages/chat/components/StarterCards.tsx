@@ -36,10 +36,15 @@ const handleCardClick = (
 };
 
 const chipClass =
-  "group flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/40 backdrop-blur-sm " +
-  "px-2.5 h-7 shadow-[0_1px_2px_hsl(var(--foreground)/0.04)] " +
-  "hover:bg-muted/70 hover:border-border/70 transition-colors duration-150 active:scale-[0.97]";
+  "group flex items-center gap-2 rounded-2xl border border-border/50 bg-card " +
+  "px-4 h-9 shadow-[0_2px_6px_hsl(var(--foreground)/0.06)] " +
+  "hover:shadow-[0_6px_16px_hsl(var(--foreground)/0.10)] hover:border-border " +
+  "transition-all duration-200 active:scale-[0.97]";
 
+const iconClass =
+  "w-4 h-4 text-muted-foreground shrink-0 transition-colors group-hover:text-foreground";
+const labelClass =
+  "text-xs font-medium tracking-[-0.01em] text-foreground/75 whitespace-nowrap transition-colors group-hover:text-foreground";
 
 /** Desktop-only: compact icon chips shown below the composer (no images). */
 export function StarterChips({ onPick, className = "" }: StarterCardsProps) {
@@ -51,7 +56,7 @@ export function StarterChips({ onPick, className = "" }: StarterCardsProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className={`hidden md:flex flex-wrap items-center justify-center gap-2 ${className}`}
+        className={`hidden md:flex flex-wrap items-center justify-center gap-2.5 ${className}`}
       >
         {CARDS.map((c) => (
           <button
@@ -60,13 +65,8 @@ export function StarterChips({ onPick, className = "" }: StarterCardsProps) {
             onClick={() => handleCardClick(c, onPick)}
             className={chipClass}
           >
-            <c.Icon
-              className="w-[13px] h-[13px] text-muted-foreground shrink-0 transition-colors group-hover:text-foreground"
-              strokeWidth={1.75}
-            />
-            <span className="text-[11.5px] font-medium tracking-[-0.01em] text-foreground/80 whitespace-nowrap transition-colors group-hover:text-foreground">
-              {c.title}
-            </span>
+            <c.Icon className={iconClass} strokeWidth={1.75} />
+            <span className={labelClass}>{c.title}</span>
           </button>
         ))}
       </motion.div>
@@ -81,9 +81,9 @@ export function StarterCards({ onPick, className = "" }: StarterCardsProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      className={`w-full md:hidden ${className}`}
+      className={`relative w-full md:hidden ${className}`}
     >
-      <div className="flex gap-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden snap-x">
+      <div className="flex gap-2.5 overflow-x-auto px-5 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden snap-x">
         {CARDS.map((c) => (
           <button
             key={c.id}
@@ -91,18 +91,16 @@ export function StarterCards({ onPick, className = "" }: StarterCardsProps) {
             onClick={() => handleCardClick(c, onPick)}
             className={`snap-start shrink-0 ${chipClass}`}
           >
-            <c.Icon
-              className="w-[13px] h-[13px] text-muted-foreground shrink-0 transition-colors group-hover:text-foreground"
-              strokeWidth={1.75}
-            />
-            <span className="text-[11.5px] font-medium tracking-[-0.01em] text-foreground/80 whitespace-nowrap transition-colors group-hover:text-foreground">
-              {c.title}
-            </span>
+            <c.Icon className={iconClass} strokeWidth={1.75} />
+            <span className={labelClass}>{c.title}</span>
           </button>
         ))}
       </div>
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
     </motion.div>
   );
 }
+
 
 export default StarterCards;
