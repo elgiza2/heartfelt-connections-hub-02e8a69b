@@ -116,11 +116,8 @@ export default function ComputerTaskCard({ taskId }: Props) {
 
   return (
     <div className="my-1">
-      {task?.result_text && (
-        <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-foreground/90">
-          {task.result_text}
-        </p>
-      )}
+      {task?.result_text && <ChatMessage role="assistant" content={task.result_text} />}
+
 
       {files.length > 0 && (
         <div className="mt-2 space-y-2">
