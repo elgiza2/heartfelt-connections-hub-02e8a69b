@@ -11,7 +11,7 @@
  */
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-const API_BASE = Deno.env.get("FREESTYLE_API_BASE") || "https://beta-api.freestyle.sh";
+const API_BASE = Deno.env.get("FREESTYLE_API_BASE") || "https://api.freestyle.sh";
 
 export class FreestyleError extends Error {
   status: number;
@@ -77,6 +77,7 @@ export class Freestyle {
     path: string,
     body?: unknown,
     timeoutMs = 120_000,
+    rawBody?: Uint8Array,
   ): Promise<T> {
     const keys = await this.pool();
     let lastStatus = 500;
@@ -87,8 +88,11 @@ export class Freestyle {
       try {
         const resp = await fetch(`${API_BASE}${path}`, {
           method,
-          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-          body: body === undefined ? undefined : JSON.stringify(body),
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": rawBody ? "application/octet-stream" : "application/json",
+          },
+          body: rawBody ?? (body === undefined ? undefined : JSON.stringify(body)),
           signal: controller.signal,
         });
         const text = await resp.text();
@@ -142,12 +146,24 @@ export class Freestyle {
     throw new FreestyleError(504, `VM never reached running state (last: ${state})`);
   }
 
+  /**
+   * Guest file write: `PUT /fs/write` takes the bytes as the body, with the
+   * destination path and a content digest as query parameters.
+   */
   async writeFile(vmId: string, path: string, content: string): Promise<void> {
-    await this.request("PUT", `/v5/vms/${encodeURIComponent(vmId)}/fs/write`, {
-      path,
-      content,
-      encoding: "utf8",
-    });
+    const bytes = new TextEncoder().encode(content);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const sha256 = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const query = `?path=${encodeURIComponent(path)}&sha256=${sha256}`;
+    await this.request(
+      "PUT",
+      `/v5/vms/${encodeURIComponent(vmId)}/fs/write${query}`,
+      undefined,
+      120_000,
+      bytes,
+    );
   }
 
   async exec(
@@ -180,7 +196,6 @@ export class Freestyle {
       await this.request("POST", "/v5/tls", {
         action: "allow",
         domain,
-        protocol: "http",
         source: { public: true },
         destination: { vmId, port },
       });
