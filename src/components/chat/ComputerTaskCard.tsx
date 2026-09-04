@@ -15,6 +15,8 @@ import {
   type ComputerEvent,
 } from "@/lib/computer/client";
 import ThinkingTrace from "@/components/chat/ThinkingTrace";
+import ChatMessage from "@/components/chat/ChatMessage";
+
 import { clearActiveComputerRun, setActiveComputerRun } from "@/lib/computer/activeRun";
 
 interface Props {
