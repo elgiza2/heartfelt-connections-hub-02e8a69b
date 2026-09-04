@@ -405,9 +405,11 @@ export async function handleComputerAgent(payload: ComputerPayload | null): Prom
       }
 
       const providerId = String(
-        res.data?.task_id ?? res.data?.id ?? res.data?.data?.task_id ?? "",
+        res.data?.task_id ?? res.data?.id ?? res.data?.data?.task_id ?? res.data?.data?.id ?? "",
       );
       if (!providerId) {
+        console.error(`browser-use create: no task id in ${JSON.stringify(res.data).slice(0, 500)}`);
+
         await supabase
           .from("computer_tasks")
           .update({ status: "failed", error: "provider_error", updated_at: new Date().toISOString() })
