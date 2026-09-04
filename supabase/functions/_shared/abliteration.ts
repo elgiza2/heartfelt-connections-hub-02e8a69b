@@ -145,6 +145,13 @@ export async function callModel(
   models: string[],
   payload: Record<string, unknown>,
 ): Promise<ModelResponse | null> {
+  // Primary provider: Cerebras (per-role model split). Abliteration is fallback.
+  const role = typeof (payload as Record<string, unknown>).agentRole === "string"
+    ? String((payload as Record<string, unknown>).agentRole)
+    : null;
+  const cerebras = await callCerebras(models, payload, role);
+  if (cerebras) return { response: cerebras.response, model: cerebras.model };
+
   const keys = await modelKeys(admin);
   if (!keys.length) {
     console.error("abliteration: no key configured");
@@ -153,7 +160,9 @@ export async function callModel(
   const ladder = Array.from(
     new Set([...(models.length ? models.map(resolveModel) : []), ...MODEL_LADDER]),
   );
-  const body = normalizePayload(payload);
+  const { agentRole: _role, ...clean } = payload as Record<string, any>;
+  const body = normalizePayload(clean);
+
 
   for (const model of ladder) {
     for (const entry of keys) {
