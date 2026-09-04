@@ -2289,13 +2289,13 @@ body {
 .prose-chat.lang-ar,
 .user-bubble.lang-ar {
   font-family: var(--font-arabic-serif-stack);
-  line-height: 1.95;
+  line-height: 1.75;
   letter-spacing: 0;
   text-align: start;
   word-spacing: 0.02em;
 }
 .prose-chat.lang-ar {
-  font-size: 1.0625rem;
+  font-size: 0.9375rem;
 }
 .prose-chat.lang-ar p {
   margin-bottom: 0.85em;
@@ -2309,11 +2309,11 @@ body {
   margin-bottom: 0.4em;
 }
 .prose-chat.lang-ar h1 {
-  font-size: 1.55em;
+  font-size: 1.3em;
   line-height: 1.4;
 }
 .prose-chat.lang-ar h2 {
-  font-size: 1.3em;
+  font-size: 1.15em;
   line-height: 1.45;
 }
 .prose-chat.lang-ar h3 {
@@ -2354,7 +2354,7 @@ body {
   text-align: left;
 }
 .prose-chat.lang-en {
-  font-size: 1rem;
+  font-size: 0.9375rem;
 }
 .prose-chat.lang-en h1 {
   font-size: 1.5em;
@@ -2388,7 +2388,7 @@ body {
   text-align: start;
 }
 .prose-chat.lang-other {
-  font-size: 1.0625rem;
+  font-size: 0.9375rem;
 }
 .prose-chat.lang-other p {
   margin-bottom: 0.8em;
@@ -2421,14 +2421,14 @@ html[dir="rtl"] .user-bubble.lang-ar {
   font-family: var(--font-arabic-ui-stack);
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "ss01" 1;
   font-variant-numeric: proportional-nums;
-  line-height: 2;
+  line-height: 1.8;
   letter-spacing: 0;
-  word-spacing: 0.04em;
+  word-spacing: 0.02em;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 html[dir="rtl"] .prose-chat.lang-ar {
-  font-size: 1.075rem;
+  font-size: 0.9375rem;
 }
 html[dir="rtl"] .prose-chat.lang-ar p {
   margin-bottom: 1em;
@@ -2436,9 +2436,6 @@ html[dir="rtl"] .prose-chat.lang-ar p {
 html[dir="rtl"] .prose-chat.lang-ar strong {
   font-weight: 700;
   color: hsl(var(--foreground));
-  background: linear-gradient(180deg, transparent 65%, hsla(45, 90%, 60%, 0.18) 65%);
-  padding: 0 0.1em;
-  border-radius: 2px;
 }
 html[dir="rtl"] .prose-chat.lang-ar h1,
 html[dir="rtl"] .prose-chat.lang-ar h2,
@@ -2450,14 +2447,11 @@ html[dir="rtl"] .prose-chat.lang-ar h3 {
   margin-bottom: 0.5em;
 }
 html[dir="rtl"] .prose-chat.lang-ar h1 {
-  font-size: 1.6em;
-  background: linear-gradient(135deg, hsl(45 95% 65%) 0%, hsl(20 90% 60%) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 1.3em;
+  color: hsl(var(--foreground));
 }
 html[dir="rtl"] .prose-chat.lang-ar h2 {
-  font-size: 1.32em;
+  font-size: 1.15em;
   position: relative;
   padding-right: 0.65em;
 }

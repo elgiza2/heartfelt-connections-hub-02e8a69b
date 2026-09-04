@@ -172,7 +172,7 @@ const AnimatedInput = ({
     return () => window.removeEventListener("megsy:composer-insert", insert);
   }, [onChange]);
 
-  const isActive = focused || !!value;
+  
 
 
   useEffect(() => {
@@ -294,8 +294,6 @@ const AnimatedInput = ({
       {/* Desktop: liquid-glass surface (no solid card wrapper) */}
       <div className="md:rounded-[28px]">
         <motion.div
-          animate={{ scale: isActive ? 1.004 : 1 }}
-          transition={{ type: "spring", stiffness: 320, damping: 26 }}
           className={`chat-composer-frame chat-mobile-input-glow composer-card pointer-events-auto rounded-[24px] px-3.5 pt-3 pb-2.5 relative z-10 md:rounded-[24px] md:px-4 md:pt-3 md:pb-2.5 border-0 ${chatContext ? "chat-composer-liquid" : ""}`}
         >
           {/* Active service strip — fused into the top of the composer card */}
@@ -316,10 +314,10 @@ const AnimatedInput = ({
               {isEditing && (
                 <motion.div
                   key="editing-chip"
-                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4, scale: 0.96 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 26, mass: 0.8 }}
+                  transition={{ duration: 0.16, ease: "easeOut" }}
                   className="overflow-hidden"
                 >
                   <div className="flex items-center justify-between gap-2 pt-2 pb-1.5">
@@ -433,8 +431,8 @@ const AnimatedInput = ({
             <motion.button
               type="button"
               onClick={onPlusClick}
-              whileTap={{ scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 420, damping: 24 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
               className="animated-plus-btn shrink-0 inline-flex w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border-0 outline-none text-foreground/70 hover:text-foreground transition-colors"
               style={{ boxShadow: "none", background: "transparent", border: 0 }}
               aria-label={uiT("openTools")}
@@ -463,11 +461,11 @@ const AnimatedInput = ({
               {isLoading ? (
                 <motion.button
                   key="stop"
-                  initial={{ opacity: 0, scale: 0.6 }}
+                  initial={{ opacity: 0, scale: 0.92 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.6 }}
-                  transition={{ type: "spring", stiffness: 380, damping: 22 }}
-                  whileTap={{ scale: 0.9 }}
+                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={onCancel}
                   className="shrink-0 w-11 h-11 md:h-10 md:w-10 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-[0_2px_10px_rgba(0,0,0,0.2)] hover:opacity-90 transition-opacity"
                   aria-label={uiT("stopGeneration")}
@@ -477,11 +475,11 @@ const AnimatedInput = ({
               ) : (
                 <motion.button
                   key="send"
-                  initial={{ opacity: 0, scale: 0.6 }}
+                  initial={{ opacity: 0, scale: 0.92 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.6 }}
-                  transition={{ type: "spring", stiffness: 380, damping: 22 }}
-                  whileTap={{ scale: 0.9 }}
+                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={handleSendWithSlash}
                   disabled={disabled || (!value.trim() && !canSendWithoutText)}
                   data-testid="mobile-composer-send"

@@ -15,7 +15,6 @@ import {
   Ellipsis,
   ChevronDown,
   Terminal as TerminalIcon,
-  FolderTree,
   Brain,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1701,41 +1700,27 @@ const ChatMessage = ({
             {/* Shopping product cards removed */}
 
             {hasProjectPreview && (
-              <div className="mb-3 flex flex-col sm:flex-row gap-2">
+              <div className="mb-3">
                 <button
                   type="button"
                   onClick={openProjectPreview}
-                  className="group inline-flex items-center gap-3 flex-1 rounded-2xl border border-border/60 bg-gradient-to-br from-surface-1 to-surface-3 px-4 py-3 text-left shadow-sm hover:shadow-md hover:border-[var(--megsy-blue)]/60 transition-all"
+                  className="group inline-flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3 text-left transition-colors hover:border-[var(--megsy-blue)]/50"
                 >
-                  <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--megsy-blue)]/20 text-[var(--megsy-blue)] group-hover:bg-[var(--megsy-blue)] group-hover:text-foreground transition-colors">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--megsy-blue)]/15 text-[var(--megsy-blue)]">
                     <Play className="w-4 h-4" fill="currentColor" />
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-foreground">
+                    <span className="block text-[13px] font-semibold text-foreground">
                       Project preview
                     </span>
-                    <span className="block text-[11px] text-foreground/60 truncate">
-                      {projectFiles.length} files · Click to run and browse
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStudioOpen(true)}
-                  className="group inline-flex items-center gap-3 flex-1 rounded-2xl border border-border/60 bg-gradient-to-br from-surface-1 to-surface-3 px-4 py-3 text-left shadow-sm hover:shadow-md hover:border-emerald-400/60 transition-all"
-                >
-                  <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-background transition-colors">
-                    <FolderTree className="w-4 h-4" />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-foreground">Files</span>
-                    <span className="block text-[11px] text-foreground/60 truncate">
-                      {projectFiles.length} files · Browse and edit
+                    <span className="block text-[11px] text-muted-foreground truncate">
+                      {projectFiles.length} files
                     </span>
                   </span>
                 </button>
               </div>
             )}
+
 
 
 
@@ -1967,70 +1952,50 @@ const ChatMessage = ({
             {/* Optional artifact slot (e.g. docs/slides card) — rendered before action buttons */}
             {bottomSlot && !isStreaming && <div className="mt-3">{bottomSlot}</div>}
 
-            {/* Action buttons: like + copy + dislike only */}
+            {/* Action buttons: like + copy + dislike only — quiet, no shadows, no springy motion */}
             {!isStreaming && !hasRunningTool && content && !showSlidesInfoBox && !hideActions && (
-              <div className="flex items-center gap-1 mt-2">
-                <motion.button
+              <div className="flex items-center gap-0.5 mt-1.5">
+                <button
+                  type="button"
                   onClick={() => handleLikeAction(liked === true ? null : true)}
-                  className={`group p-1.5 rounded-xl transition-colors ${
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150 ${
                     liked === true
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                      ? "text-primary"
+                      : "text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5"
                   }`}
                   title="Like"
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 15 }}
                 >
-                  <motion.span
-                    whileTap={{ rotate: -18, scale: 1.25 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 12 }}
-                    className="block"
-                  >
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                  </motion.span>
-                </motion.button>
+                  <ThumbsUp className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                </button>
 
-                <motion.button
+                <button
+                  type="button"
                   onClick={handleCopy}
-                  className="group p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors duration-150"
                   title={copied ? "Copied" : "Copy"}
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 15 }}
                 >
-                  <motion.span
-                    whileTap={{ y: -2 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 12 }}
-                    className="block"
-                  >
-                    {copied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </motion.span>
-                </motion.button>
+                  {copied ? (
+                    <Check className="w-[15px] h-[15px] text-emerald-500" strokeWidth={1.75} />
+                  ) : (
+                    <Copy className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                  )}
+                </button>
 
-                <motion.button
+                <button
+                  type="button"
                   onClick={() => handleLikeAction(liked === false ? null : false)}
-                  className={`group p-1.5 rounded-xl transition-colors ${
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150 ${
                     liked === false
-                      ? "text-destructive bg-destructive/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                      ? "text-destructive"
+                      : "text-muted-foreground/70 hover:text-foreground hover:bg-foreground/5"
                   }`}
                   title="Dislike"
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 15 }}
                 >
-                  <motion.span
-                    whileTap={{ rotate: 18, scale: 1.25 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 12 }}
-                    className="block"
-                  >
-                    <ThumbsDown className="w-3.5 h-3.5" />
-                  </motion.span>
-                </motion.button>
+                  <ThumbsDown className="w-[15px] h-[15px]" strokeWidth={1.75} />
+                </button>
               </div>
             )}
+
             {!isStreaming && !hasRunningTool && content && (
               <ReactionsRow
                 reactions={reactions || []}

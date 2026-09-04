@@ -19,3 +19,20 @@
 
 - [x] Serper search key: read env names `serper`/`SERPER`/`SERPER_API_KEY` in _shared/search/webSearchCore.ts
 - [ ] GLM model: not served by abliteration.ai (/v1/models = abliterated-model, -large, -large-v2). Needs a GLM provider key (z.ai) to switch.
+
+## Chat UI/UX pass — 2026-09-04
+Done:
+- Smaller, calmer chat typography (Arabic/English/other), no gradient headings
+- Message action buttons: no springy rotate/scale, no shadows
+- Composer: removed focus scale jitter, softened tap/enter animations
+- Deep research now calls the deployed edge function (was hitting a dev-only /api route)
+- Removed the duplicate "Files" button under project results
+
+Open:
+- Raw JSON/tool output still leaks into some chat messages
+- Agent-delivered files/reports should render as clean clickable cards with preview
+- Slides: blank-slide generation, model picker, thinking display, deck card + viewer redesign (sticky download/orientation, floating back)
+- Image generation panel redesign
+- Move image/video/slides model pickers into the composer
+- Plus menu + chips redesign
+- Integrations sheet opens slowly
