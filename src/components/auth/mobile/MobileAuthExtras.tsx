@@ -34,6 +34,10 @@ interface Props {
   onBack: () => void;
 }
 
+const AUTH_HERO_MP4 = "/route-assets/auth/auth-hero.mp4";
+const AUTH_HERO_WEBM = "/route-assets/auth/auth-hero.webm";
+const AUTH_HERO_POSTER = "/route-assets/auth/auth-hero-poster.jpg";
+
 const FONT_SERIF = '"ITC Garamond Std Narrow", "Playfair Display", Garamond, serif';
 const FONT_SANS = 'Inter, -apple-system, "SF Pro Text", system-ui, sans-serif';
 
@@ -122,25 +126,46 @@ export default function MobileAuthExtras(p: Props) {
   };
 
   const fieldStyle = {
-    background: "var(--overlay-white-05)",
-    border: "1px solid var(--overlay-white-12)",
+    background: "var(--overlay-white-06)",
+    border: "1px solid var(--overlay-white-14)",
     backdropFilter: "blur(10px)",
     WebkitBackdropFilter: "blur(10px)",
   } as const;
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full overflow-hidden text-foreground bg-background"
-      style={{ fontFamily: FONT_SANS }}
+      dir="ltr"
+      className="relative min-h-[100dvh] w-full overflow-hidden bg-[#02040c] text-foreground"
+      style={{ fontFamily: FONT_SANS, touchAction: "manipulation" }}
     >
+      {/* Same hero clip as the sign-up screen */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+        poster={AUTH_HERO_POSTER}
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        style={{ objectPosition: "center 48%", zIndex: 0 }}
+      >
+        <source src={AUTH_HERO_WEBM} type="video/webm" />
+        <source src={AUTH_HERO_MP4} type="video/mp4" />
+      </video>
+
+      {/* Bottom fade overlay */}
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="absolute inset-x-0 bottom-0 h-[54%] pointer-events-none"
         style={{
+          zIndex: 1,
           background:
-            "radial-gradient(120% 60% at 50% 0%, rgba(120,140,220,0.10) 0%, rgba(2,4,12,0) 60%)",
+            "linear-gradient(to bottom, rgba(2,4,12,0) 0%, rgba(2,4,12,.35) 40%, rgba(2,4,12,.85) 78%, #02040c 100%)",
         }}
       />
+
+      <div className="relative" style={{ zIndex: 4 }}>
+        <TopBar onBack={p.onBack} />
+      </div>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -149,35 +174,32 @@ export default function MobileAuthExtras(p: Props) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="relative z-10 flex flex-col min-h-[100dvh]"
+          className="absolute inset-x-0 bottom-0 px-6"
+          style={{ zIndex: 4, paddingBottom: "max(2.25rem, env(safe-area-inset-bottom, 0px))" }}
         >
-          <TopBar onBack={p.onBack} />
-
-          <div className="flex-1 flex flex-col justify-center px-6">
-            <div className="w-full max-w-sm mx-auto mb-8 text-center">
+          <div className="w-full max-w-sm mx-auto">
+            <div className="mb-7 text-center">
               <h1
                 className="text-foreground"
                 style={{
                   fontFamily: FONT_SERIF,
                   fontWeight: 300,
-                  fontSize: "38px",
+                  fontSize: "42px",
                   lineHeight: "1.08",
                   letterSpacing: "0.2px",
+                  textShadow: "0 1px 2px rgba(0,0,0,.4)",
                 }}
               >
                 {meta.title}
               </h1>
               <p
-                className="mt-3"
-                style={{
-                  fontSize: "14px",
-                  lineHeight: "22px",
-                  color: "rgba(255,255,255,.62)",
-                }}
+                className="mt-4 text-[14px] leading-[22px] text-foreground/85"
+                style={{ fontFamily: FONT_SANS }}
               >
                 {meta.sub(p.email)}
               </p>
             </div>
+
 
             <form
               onSubmit={(e) => {
@@ -231,7 +253,7 @@ export default function MobileAuthExtras(p: Props) {
 
               {isPwd && (
                 <div
-                  className="rounded-2xl px-4 h-[52px] flex items-center gap-2"
+                  className="rounded-full px-5 h-[52px] flex items-center gap-2"
                   style={fieldStyle}
                 >
                   <input
@@ -256,7 +278,7 @@ export default function MobileAuthExtras(p: Props) {
 
               {p.screen === "forgot-password" && (
                 <div
-                  className="rounded-2xl px-4 h-[52px] flex items-center"
+                  className="rounded-full px-5 h-[52px] flex items-center"
                   style={fieldStyle}
                 >
                   <input
