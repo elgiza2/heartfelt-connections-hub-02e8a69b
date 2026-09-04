@@ -261,18 +261,49 @@ export async function deployStaticSite(
   }
 
   const client = new Freestyle(admin);
+  const started = Date.now();
+  const stage = (name: string) => console.log(`freestyle deploy: ${name} (+${Date.now() - started}ms)`);
+  stage("creating vm");
   const vmId = await client.createVm(opts.displayName ?? "megsy-site");
+  stage(`vm ${vmId} created`);
   await client.waitForRunning(vmId);
-  await client.exec(vmId, "mkdir -p /app/public");
+  stage("vm running");
+  await client.exec(vmId, "mkdir -p /app/public", 60_000);
   for (const file of clean) {
     await client.writeFile(vmId, `/app/public/${file.path}`, file.content);
   }
-  await client.writeFile(vmId, "/app/server.mjs", STATIC_SERVER);
-  await client.exec(
+  stage("files written");
+  // The base image is a plain Ubuntu, so the serving runtime is discovered
+  // rather than assumed: python3 ships with the image, node only sometimes.
+  const probeRuntime = await client.exec(
     vmId,
-    "pkill -f /app/server.mjs || true; cd /app && (setsid nohup node /app/server.mjs > /tmp/server.log 2>&1 &) ; sleep 2; curl -sf -o /dev/null http://127.0.0.1:3000/ && echo UP || (cat /tmp/server.log; exit 1)",
+    "command -v python3 || true; command -v node || true",
     60_000,
   );
+  const hasPython = /python3/.test(probeRuntime.stdout);
+  let serveCmd: string;
+  if (hasPython) {
+    // No pkill here: `pkill -f` would match this very shell command line and
+    // terminate the exec session before the server is ever probed.
+    serveCmd =
+      "cd /app/public && (setsid nohup python3 -m http.server 3000 --bind 0.0.0.0 > /tmp/server.log 2>&1 &)";
+  } else {
+    await client.writeFile(vmId, "/app/server.mjs", STATIC_SERVER);
+    serveCmd =
+      "cd /app && (setsid nohup node /app/server.mjs > /tmp/server.log 2>&1 &)";
+  }
+  const boot = await client.exec(
+    vmId,
+    `${serveCmd} ; for i in $(seq 1 15); do curl -sf -o /dev/null http://127.0.0.1:3000/ && echo UP && exit 0; sleep 1; done; cat /tmp/server.log; exit 1`,
+    90_000,
+  );
+  if (boot.exitCode !== 0 || !/UP/.test(boot.stdout)) {
+    throw new FreestyleError(
+      500,
+      `site server never came up: ${(boot.stdout + boot.stderr).slice(-300)}`,
+    );
+  }
+  stage("server up");
   const domain = await client.exposePort(vmId, 3000, opts.subdomain);
   const url = `https://${domain}`;
   // The edge certificate needs a moment before the first request succeeds.
