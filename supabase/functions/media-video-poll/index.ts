@@ -4,6 +4,7 @@
  * Response: { status: "processing"|"completed"|"failed", progress?, video_url? }
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { deapiVideoPoll, renderfulVideoPoll } from "../_shared/videoProviders.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +80,55 @@ Deno.serve(async (req) => {
   }
   if (job.status === "failed" || job.status === "error" || job.status === "cancelled") {
     return json({ status: "failed", error: job.error ?? "video job failed" });
+  }
+
+  // DeAPI / Renderful jobs poll with the function secret for that provider.
+  if (job.provider === "deapi" || job.provider === "renderful") {
+    const key = Deno.env.get(job.provider === "deapi" ? "DEAPI_API_KEY" : "RENDERFUL_API_KEY");
+    if (!key) return json({ status: "failed", error: `${job.provider} key is not configured` });
+    const result = job.provider === "deapi"
+      ? await deapiVideoPoll(key, String(job.generation_id))
+      : await renderfulVideoPoll(key, String(job.generation_id));
+
+    if (result.status === "completed") {
+      await admin
+        .from("pending_video_jobs")
+        .update({ status: "completed", video_url: result.video_url, updated_at: new Date().toISOString() })
+        .eq("id", jobId);
+      await admin.from("media_assets").insert({
+        user_id: user.id,
+        kind: "video",
+        provider: job.provider,
+        model: job.model_slug,
+        prompt: job.prompt,
+        storage_path: `${job.provider}/${job.generation_id}`,
+        public_url: result.video_url,
+        cost_credits: job.credits_charged ?? 0,
+        duration_seconds: job.duration_seconds,
+        metadata: { generation_id: job.generation_id, aspect_ratio: job.aspect_ratio },
+      });
+      void admin.from("media_generation_log").insert({
+        provider: job.provider,
+        model_id: job.model_slug,
+        user_id: user.id,
+        kind: "video",
+        status: "completed",
+      });
+    } else if (result.status === "failed") {
+      await admin
+        .from("pending_video_jobs")
+        .update({ status: "failed", error: result.error, updated_at: new Date().toISOString() })
+        .eq("id", jobId);
+      void admin.from("media_generation_log").insert({
+        provider: job.provider,
+        model_id: job.model_slug,
+        user_id: user.id,
+        kind: "video",
+        status: "failed",
+        error_message: result.error.slice(0, 500),
+      });
+    }
+    return json(result);
   }
 
   // Look up the provider key used to submit this job so we can poll with it.
