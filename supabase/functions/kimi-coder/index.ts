@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
   ];
 
   const upstream = await callModel(admin, [String(body.model ?? "")], {
+    agentRole: "coder",
     messages,
     stream: true,
     max_tokens: 16_000,

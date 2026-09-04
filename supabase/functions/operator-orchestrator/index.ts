@@ -74,6 +74,7 @@ async function planNext(goal: string, priorSteps: Array<Record<string, unknown>>
     .join("\n") || "(no steps taken yet)";
 
   const result = await callModel(admin, [...MODEL_LADDER], {
+    agentRole: "manager",
     messages: [
       { role: "system", content: PLANNER_SYSTEM },
       {

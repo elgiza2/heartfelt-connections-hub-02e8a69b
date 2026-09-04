@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
 
   try {
     const result = await callModel(admin, [], {
+      agentRole: "memory",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
