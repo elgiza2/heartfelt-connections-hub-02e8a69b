@@ -8680,49 +8680,64 @@ export type Database = {
           cached_until: string | null
           cached_url: string | null
           created_at: string
+          duration: number | null
           fallback_path: string | null
           file_id: string
           file_unique_id: string | null
+          height: number | null
           id: string
           kind: string | null
           metadata: Json | null
           mime_type: string | null
           original_filename: string | null
           size_bytes: number | null
+          storage_provider: string
+          thumbnail_file_id: string | null
           updated_at: string
           user_id: string | null
+          width: number | null
         }
         Insert: {
           cached_until?: string | null
           cached_url?: string | null
           created_at?: string
+          duration?: number | null
           fallback_path?: string | null
           file_id: string
           file_unique_id?: string | null
+          height?: number | null
           id?: string
           kind?: string | null
           metadata?: Json | null
           mime_type?: string | null
           original_filename?: string | null
           size_bytes?: number | null
+          storage_provider?: string
+          thumbnail_file_id?: string | null
           updated_at?: string
           user_id?: string | null
+          width?: number | null
         }
         Update: {
           cached_until?: string | null
           cached_url?: string | null
           created_at?: string
+          duration?: number | null
           fallback_path?: string | null
           file_id?: string
           file_unique_id?: string | null
+          height?: number | null
           id?: string
           kind?: string | null
           metadata?: Json | null
           mime_type?: string | null
           original_filename?: string | null
           size_bytes?: number | null
+          storage_provider?: string
+          thumbnail_file_id?: string | null
           updated_at?: string
           user_id?: string | null
+          width?: number | null
         }
         Relationships: []
       }
