@@ -399,7 +399,9 @@ export async function handleComputerAgent(payload: ComputerPayload | null): Prom
         },
       });
       for (let i = 1; i < llmCandidates.length && !res.ok; i += 1) {
-        if (!/not available on the/i.test((res as UpstreamFail).message ?? "")) break;
+        const failMsg = (res as UpstreamFail).message ?? "";
+        if (!/not available on the|body.,.llm|Input should be/i.test(failMsg)) break;
+
         if (llmCandidates[i] === llmCandidates[0]) continue;
         res = await callUpstream(supabase, {
           path: "/tasks",
