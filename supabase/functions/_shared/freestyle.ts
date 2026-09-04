@@ -283,12 +283,14 @@ export async function deployStaticSite(
   const hasPython = /python3/.test(probeRuntime.stdout);
   let serveCmd: string;
   if (hasPython) {
+    // No pkill here: `pkill -f` would match this very shell command line and
+    // terminate the exec session before the server is ever probed.
     serveCmd =
-      "pkill -f 'http.server 3000' || true; cd /app/public && (setsid nohup python3 -m http.server 3000 --bind 0.0.0.0 > /tmp/server.log 2>&1 &)";
+      "cd /app/public && (setsid nohup python3 -m http.server 3000 --bind 0.0.0.0 > /tmp/server.log 2>&1 &)";
   } else {
     await client.writeFile(vmId, "/app/server.mjs", STATIC_SERVER);
     serveCmd =
-      "pkill -f /app/server.mjs || true; cd /app && (setsid nohup node /app/server.mjs > /tmp/server.log 2>&1 &)";
+      "cd /app && (setsid nohup node /app/server.mjs > /tmp/server.log 2>&1 &)";
   }
   const boot = await client.exec(
     vmId,
