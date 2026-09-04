@@ -15,7 +15,6 @@ import {
   Ellipsis,
   ChevronDown,
   Terminal as TerminalIcon,
-  FolderTree,
   Brain,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
