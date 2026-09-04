@@ -12,10 +12,23 @@ export const DEAPI_VIDEO: Record<string, { api: string; steps: number; fps: numb
   "deapi-ltx-video": { api: "Ltxv_13B_0_9_8_Distilled_FP8", steps: 1, fps: 30 },
 };
 
-// Renderful text-to-video slug -> image-to-video variant.
+/**
+ * Renderful ids as they appear in the live catalogue. Our own slugs are
+ * prefixed with `renderful-`, so the prefix is stripped before calling the API
+ * and the image-to-video twin is `<id>-i2v` unless it needs an explicit map.
+ */
 export const RENDERFUL_I2V: Record<string, string> = {
-  "renderful-veo-3-fast": "renderful-veo-3-fast-i2v",
+  "veo-3-fast": "google-veo-3-fast-i2v",
+  "runway-gen4-turbo": "runway-gen4-turbo",
+  "kling-o1": "kling-o1",
 };
+
+export function renderfulModelId(slug: string, i2v: boolean): string {
+  const bare = (slug || "").replace(/^renderful-/i, "");
+  if (!i2v) return bare;
+  return RENDERFUL_I2V[bare] ?? (bare.endsWith("-i2v") ? bare : `${bare}-i2v`);
+}
+
 
 export const VIDEO_SLUG_ALIASES: Record<string, string> = {
   "deapi-ltx-2": "deapi-ltx-video",
