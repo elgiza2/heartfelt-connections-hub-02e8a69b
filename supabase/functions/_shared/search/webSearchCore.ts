@@ -327,11 +327,14 @@ async function bravePaced(query: string, count: number, offset: number): Promise
 }
 
 async function keylessSearch(query: string, count: number, offset = 0): Promise<WebSearchResponse> {
+  const viaApi = await apiSearch(query, count);
+  if (viaApi.length) return { results: viaApi };
   const [brave, duck, news] = await Promise.all([
     bravePaced(query, count, offset),
     duckSearch(query, count, offset),
     googleNewsSearch(query, count, offset),
   ]);
+
   const seen = new Set<string>();
   const merged: WebSearchResult[] = [];
   for (const item of [...brave, ...duck, ...news.results]) {
