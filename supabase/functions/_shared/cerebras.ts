@@ -4,11 +4,12 @@
  * Endpoint: https://api.cerebras.ai/v1/chat/completions
  * Key: function secret `CEREBRAS_API_KEY`.
  *
- * The account currently serves three models, so every agent role is mapped onto
- * one of them (verified live against /v1/models):
- *   - qwen-3.8-27b   → the default workhorse (tools, workers, chat)
- *   - gpt-oss-120b   → manager / planner / final answers (strongest)
- *   - gemma-4-31b    → cheapest lane (titles, memory extraction, classifiers)
+ * The public endpoints serve a small catalog, so every agent role is mapped onto
+ * one of them (verified live against /v1/models). The largest served model
+ * (gpt-oss-120b, 120B params) is the default for all real work:
+ *   - gpt-oss-120b   → chat, workers, manager, planner, coding, research, final
+ *   - qwen-3.8-27b   → cheap lane only (titles, memory extraction, classifiers)
+ *   - gemma-4-31b    → last-resort fallback
  * Requested ids that this provider does not serve (Kimi, GLM, abliterated-*)
  * are mapped onto the closest role model instead of 404-ing.
  */
@@ -16,17 +17,18 @@
 const BASE = Deno.env.get("CEREBRAS_API_BASE") || "https://api.cerebras.ai/v1";
 
 export const CEREBRAS_MODELS = {
-  fast: "gemma-4-31b",
-  worker: "qwen-3.8-27b",
+  fast: "qwen-3.8-27b",
+  worker: "gpt-oss-120b",
   manager: "gpt-oss-120b",
 } as const;
 
 /** Every id the provider serves, in fallback order. */
 export const CEREBRAS_LADDER: string[] = [
-  CEREBRAS_MODELS.worker,
-  CEREBRAS_MODELS.manager,
-  CEREBRAS_MODELS.fast,
+  "gpt-oss-120b",
+  "qwen-3.8-27b",
+  "gemma-4-31b",
 ];
+
 
 const ENV_NAMES = ["CEREBRAS_API_KEY", "CEREBRAS_KEY", "cerebras"];
 
