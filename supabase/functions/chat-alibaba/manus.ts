@@ -32,6 +32,25 @@ const LOOP_BUDGET_MS = 240_000;
 /** Independent tool calls executed concurrently inside one step. */
 const PARALLEL_LIMIT = 8;
 
+/* ── Token governor ───────────────────────────────────────────────────────────
+ * The loop's cost is dominated by three things: the tool catalog re-sent every
+ * step, full tool outputs kept in the loop transcript, and a manager-review
+ * message after every single step. We keep the same capability but pay for it
+ * once: the full catalog is advertised only while the plan is being formed, the
+ * transcript carries trimmed tool output (the FULL text still goes to the
+ * evidence pack), older steps are compacted into a digest, and the manager only
+ * reviews when there is something to judge.
+ * ---------------------------------------------------------------------------*/
+/** Tool output kept inside the loop transcript (evidence keeps the full text). */
+const LOOP_TOOL_CAP = 1600;
+/** Steps that see the complete tool catalog; later steps see core + used. */
+const FULL_CATALOG_STEPS = 2;
+/** Transcript size that triggers compaction of the older steps. */
+const COMPACT_AFTER = 16;
+/** Steps kept verbatim after a compaction. */
+const KEEP_TAIL = 8;
+
+
 const SPECIALIST_IDS = Object.keys(AGENTS).filter((id) => id !== "general");
 
 const LOOP_SYSTEM = `You are MEGSY's lead agent — the MANAGER of a team of worker agents and real tools. You run an autonomous work loop before the final answer is written.
@@ -254,15 +273,15 @@ async function runSpecialist(
 ): Promise<string> {
   const data = await raw(profile.models, {
     temperature: profile.temperature,
-    max_tokens: 2600,
+    max_tokens: 1500,
     messages: [
       {
         role: "system",
         content: `${profileSystem(profile)}
 
-You are executing ONE subtask for the lead agent, not talking to the user. Deliver the finished artifact or a dense brief: facts, numbers, code, copy — no preamble, no questions, no meta commentary. Max ~500 words unless code requires more.`,
+You are executing ONE subtask for the lead agent, not talking to the user. Deliver the finished artifact or a dense brief: facts, numbers, code, copy — no preamble, no questions, no meta commentary. Max ~320 words unless code requires more. No repetition, no restating the goal.`,
       },
-      { role: "user", content: context ? `${goal}\n\nEvidence available:\n${context.slice(0, 6000)}` : goal },
+      { role: "user", content: context ? `${goal}\n\nEvidence available:\n${context.slice(0, 3000)}` : goal },
     ],
   });
   const text = data?.choices?.[0]?.message?.content;
@@ -292,6 +311,8 @@ export async function runPrimaryAgent(opts: {
   const briefs: string[] = [];
   const sources: { title: string; url: string }[] = [];
   const used = new Set<string>();
+  /** Tool names actually executed — drives the trimmed catalog after planning. */
+  const usedTools = new Set<string>();
   let todo: string[] = [];
   let notes = "";
   let steps = 0;
@@ -306,7 +327,26 @@ export async function runPrimaryAgent(opts: {
     },
   ];
 
-  const exec = async (name: string, args: any): Promise<string> => {
+  /* Web budget: the same query or page was being fetched several times in one
+   * turn, and each fetch also grows every later prompt. Repeats are answered
+   * from cache and the turn has a hard fetch ceiling. */
+  const webCache = new Map<string, string>();
+  let searches = 0;
+  let fetches = 0;
+  const MAX_SEARCHES = 8;
+  const MAX_FETCHES = 10;
+
+  const execTool = async (name: string, args: any): Promise<string> => {
+    const cacheKey = `${name}:${JSON.stringify(args ?? {})}`.slice(0, 400);
+    if (webCache.has(cacheKey)) return `(already fetched this turn)\n${webCache.get(cacheKey)}`;
+    if (name === "web_search" && searches >= MAX_SEARCHES) {
+      return "search budget for this turn is used up — work with the evidence already gathered";
+    }
+    if ((name === "open_url" || name === "scrape_page") && fetches >= MAX_FETCHES) {
+      return "page-fetch budget for this turn is used up — work with the evidence already gathered";
+    }
+    if (name === "web_search") searches += 1;
+    if (name === "open_url" || name === "scrape_page") fetches += 1;
     switch (name) {
       case "write_todo": {
         const items = Array.isArray(args?.items)
@@ -333,7 +373,9 @@ export async function runPrimaryAgent(opts: {
           lines.push(`- ${title} — ${url}\n  ${(item.description ?? "").replace(/<[^>]+>/g, "").slice(0, 240)}`);
         }
         send({ sources: sources.slice(0, 12) });
-        return lines.join("\n") || "no results";
+        const out = lines.join("\n") || "no results";
+        webCache.set(cacheKey, out);
+        return out;
       }
       case "open_url": {
         const url = String(args?.url ?? "").trim();
@@ -453,18 +495,64 @@ export async function runPrimaryAgent(opts: {
     }
   };
 
+  /** Caches web reads so a repeated URL never costs a second fetch or prompt. */
+  const exec = async (name: string, args: any): Promise<string> => {
+    const output = await execTool(name, args);
+    if (name === "open_url" || name === "scrape_page") {
+      webCache.set(`${name}:${JSON.stringify(args ?? {})}`.slice(0, 400), output.slice(0, LOOP_TOOL_CAP));
+    }
+    return output;
+  };
+
+  /**
+   * Keeps the transcript small without losing the thread: system prompt, the
+   * user request and the last few steps stay verbatim, everything older becomes
+   * a one-line digest. Compaction always starts the tail at an assistant turn so
+   * every `tool` message keeps its matching `tool_calls`.
+   */
+  const compact = () => {
+    if (messages.length <= COMPACT_AFTER) return;
+    const head = messages.slice(0, 2);
+    let cut = messages.length - KEEP_TAIL;
+    while (cut < messages.length && messages[cut].role !== "assistant") cut += 1;
+    if (cut >= messages.length) return;
+    const dropped = messages.slice(2, cut);
+    const names = dropped
+      .filter((m) => m.role === "assistant" && Array.isArray((m as any).tool_calls))
+      .flatMap((m) => ((m as any).tool_calls as any[]).map((c) => String(c?.function?.name ?? "")))
+      .filter(Boolean);
+    const digest = {
+      role: "user" as const,
+      content: `EARLIER STEPS (compacted). Tools already run: ${
+        [...new Set(names)].join(", ") || "none"
+      }. Findings are already captured — do not repeat this work.${
+        notes ? `\nWorking notes: ${notes.slice(0, 600)}` : ""
+      }`,
+    };
+    messages.splice(0, messages.length, ...head, digest, ...messages.slice(cut));
+  };
+
+  /** Advertised tool catalog: full while planning, then core + already used. */
+  const catalog = (step: number) => {
+    if (step < FULL_CATALOG_STEPS) return [...TOOLS, ...ACTION_TOOLS];
+    const keep = ACTION_TOOLS.filter((tool: any) => usedTools.has(String(tool?.function?.name ?? "")));
+    return [...TOOLS, ...keep];
+  };
+
   try {
     for (let step = 0; step < MAX_STEPS; step += 1) {
       if (Date.now() - started > LOOP_BUDGET_MS) break;
       steps = step + 1;
+      compact();
 
       const data = await raw(LEAD_MODELS, {
         temperature: 0.25,
-        max_tokens: 1400,
+        max_tokens: 1100,
         parallel_tool_calls: true,
-        tools: [...TOOLS, ...ACTION_TOOLS],
+        tools: catalog(step),
         messages,
       });
+
       const message = data?.choices?.[0]?.message;
       if (!message) break;
 
@@ -504,20 +592,25 @@ export async function runPrimaryAgent(opts: {
       }));
 
       for (const outcome of outcomes) {
+        usedTools.add(outcome.name);
         messages.push({
           role: "tool",
           tool_call_id: outcome.callId,
-          content: outcome.output.slice(0, 6000) || "(empty)",
+          // Trimmed for the transcript only — the full output is already in the
+          // evidence pack that the final answer reads.
+          content: outcome.output.slice(0, LOOP_TOOL_CAP) || "(empty)",
         });
       }
 
-      // Manager review: recite the plan, force an explicit judgement on the
-      // worker reports, and push long work onto the durable background agent
-      // before the turn runs out of wall clock.
+      // Manager review: only when there is something to judge, on a periodic
+      // checkpoint, or when the clock is running out — reviewing after every
+      // single step doubled the prompt for no added quality.
       const leftMs = LOOP_BUDGET_MS - (Date.now() - started);
       const gotReports = outcomes.some((outcome) =>
         outcome.name === "delegate_agent" || outcome.name === "delegate_team"
       );
+      const lowTime = leftMs < 70_000;
+      if (!gotReports && !lowTime && steps % 3 !== 0) continue;
       messages.push({
         role: "user",
         content: [
@@ -526,7 +619,8 @@ export async function runPrimaryAgent(opts: {
           gotReports
             ? "Judge each worker report now: accept it, re-dispatch a sharper goal, or send a reviewer to verify it. Do not accept unverified facts, numbers or code."
             : "",
-          leftMs < 70_000
+          lowTime
+
             ? "You are almost out of time. If the goal is not reachable in this turn, call start_background_task with the full remaining goal so it keeps running, then stop."
             : "Continue with the next tool calls, running independent work in parallel. Stop and write your notes only when the goal is actually met.",
         ].filter(Boolean).join("\n\n"),
@@ -545,7 +639,7 @@ export async function runPrimaryAgent(opts: {
   }
   if (evidence.length) {
     parts.push(`LIVE EVIDENCE (write facts from this, cite as [n] using the source list):\n${
-      evidence.join("\n\n").slice(0, 24_000)
+      evidence.join("\n\n").slice(0, 12_000)
     }`);
   }
   if (sources.length) {
@@ -555,10 +649,10 @@ export async function runPrimaryAgent(opts: {
   }
   if (briefs.length) {
     parts.push(`SPECIALIST OUTPUT (merge into ONE seamless answer, never mention the specialists):\n${
-      briefs.join("\n\n").slice(0, 24_000)
+      briefs.join("\n\n").slice(0, 12_000)
     }`);
   }
-  if (notes) parts.push(`LEAD AGENT NOTES:\n${notes.slice(0, 6000)}`);
+  if (notes) parts.push(`LEAD AGENT NOTES:\n${notes.slice(0, 2500)}`);
 
   return { context: parts.join("\n\n"), todo, used: [...used], steps };
 }

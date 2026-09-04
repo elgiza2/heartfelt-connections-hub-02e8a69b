@@ -81,10 +81,17 @@ function json(value: unknown, status = 200) {
 function normalizeMessages(input: Message[]): Message[] | null {
   if (!input.length || input.length > 80) return null;
   const output: Message[] = [];
-  for (const message of input.slice(-40)) {
+  // Cost control: only the recent turns are sent verbatim; older ones are kept
+  // as short excerpts so long threads stop re-billing their whole history.
+  const recent = input.slice(-16);
+  for (const [index, message] of recent.entries()) {
     if (!message || !["system", "user", "assistant"].includes(message.role)) return null;
     if (typeof message.content !== "string" && !Array.isArray(message.content)) return null;
-    output.push({ role: message.role, content: message.content });
+    const older = index < recent.length - 6;
+    const content = older && typeof message.content === "string" && message.content.length > 1200
+      ? `${message.content.slice(0, 1200)} …`
+      : message.content;
+    output.push({ role: message.role, content });
   }
   return output;
 }
@@ -344,10 +351,19 @@ Deno.serve(async (req) => {
           // Internal reasoning is on unless the caller explicitly opts out, so
           // the thinking panel always has real content to stream.
           enable_thinking: body.thinking !== false,
-          ...(body.thinking !== false ? { thinking_budget: 2048 } : {}),
+          // Thinking stays on for quality, but the budget is sized to the turn
+          // instead of always paying for the maximum.
+          ...(body.thinking !== false
+            ? { thinking_budget: body.thinking === true ? 1536 : trivialTurn ? 384 : 768 }
+            : {}),
 
           temperature: profile.temperature,
-          max_tokens: Math.min(Math.max(Number(body.maxTokens) || 8192, 512), 16384),
+          // The answer length follows the turn: short factual replies no longer
+          // reserve (and drift into filling) a 8k budget.
+          max_tokens: Math.min(
+            Math.max(Number(body.maxTokens) || (trivialTurn ? 1200 : 4096), 512),
+            16384,
+          ),
           messages: [{ role: "system", content: system }, ...messages],
         });
 
