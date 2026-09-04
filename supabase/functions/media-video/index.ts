@@ -139,21 +139,53 @@ Deno.serve(async (req) => {
     return json({ error: true, paywall: true, message }, 402);
   }
 
-  const provider = "alibaba";
+  const slug = normalizeVideoSlug(modelSlug);
+  const provider = providerForSlug(slug);
   const startedAt = Date.now();
   try {
-    const acquired = await acquireKey(provider, modelSlug);
-    if (!acquired) throw new Error("No Alibaba/DashScope media provider key is configured");
+    let generationId: string;
+    let apiKeyId: string | null = null;
 
-    const generationId = await dashscopeSubmit({
-      key: acquired.apiKey,
-      workspaceId: acquired.workspaceId,
-      model: modelSlug,
-      prompt,
-      duration,
-      aspectRatio,
-      image: startFrame,
-    });
+    if (provider === "deapi") {
+      const key = Deno.env.get("DEAPI_API_KEY");
+      if (!key) throw new Error("DeAPI key is not configured");
+      const cfg = DEAPI_VIDEO[slug] ?? DEAPI_VIDEO["deapi-ltx-video"];
+      generationId = await deapiVideoSubmit({
+        key,
+        model: cfg.api,
+        prompt,
+        steps: cfg.steps,
+        fps: cfg.fps,
+        duration,
+        aspectRatio,
+        image: startFrame,
+      });
+    } else if (provider === "renderful") {
+      const key = Deno.env.get("RENDERFUL_API_KEY");
+      if (!key) throw new Error("Renderful key is not configured");
+      generationId = await renderfulVideoSubmit({
+        key,
+        model: slug.replace(/^renderful-/, ""),
+        prompt,
+        duration,
+        aspectRatio,
+        image: startFrame,
+      });
+    } else {
+      const acquired = await acquireKey(provider, slug);
+      if (!acquired) throw new Error("No Alibaba/DashScope media provider key is configured");
+      apiKeyId = acquired.keyId;
+      generationId = await dashscopeSubmit({
+        key: acquired.apiKey,
+        workspaceId: acquired.workspaceId,
+        model: slug,
+        prompt,
+        duration,
+        aspectRatio,
+        image: startFrame,
+      });
+    }
+
 
     const { data: jobRow, error: jobErr } = await admin
       .from("pending_video_jobs")
