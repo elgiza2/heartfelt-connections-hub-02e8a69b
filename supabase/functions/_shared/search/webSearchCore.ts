@@ -102,6 +102,79 @@ function decodeHtml(input: string): string {
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
+/**
+ * Official search APIs, used before any HTML-scraping fallback because cloud
+ * IPs are frequently blocked by the scraped endpoints. Each one activates only
+ * when its function secret is present.
+ */
+async function apiSearch(query: string, count: number): Promise<WebSearchResult[]> {
+  const brave = Deno.env.get("BRAVE_API_KEY")?.trim();
+  if (brave) {
+    try {
+      const url = new URL("https://api.search.brave.com/res/v1/web/search");
+      url.searchParams.set("q", query);
+      url.searchParams.set("count", String(Math.min(Math.max(count, 1), 20)));
+      const resp = await fetch(url, {
+        headers: { Accept: "application/json", "X-Subscription-Token": brave },
+      });
+      if (resp.ok) {
+        const out = normalise(await resp.json());
+        if (out.length) return out.slice(0, count);
+      } else {
+        console.error(`brave api HTTP ${resp.status}`);
+      }
+    } catch (error) {
+      console.error("brave api failed", error);
+    }
+  }
+
+  const tavily = Deno.env.get("TAVILY_API_KEY")?.trim();
+  if (tavily) {
+    try {
+      const resp = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tavily}` },
+        body: JSON.stringify({ query, max_results: Math.min(Math.max(count, 1), 20) }),
+      });
+      if (resp.ok) {
+        const out = normalise(await resp.json());
+        if (out.length) return out.slice(0, count);
+      } else {
+        console.error(`tavily HTTP ${resp.status}`);
+      }
+    } catch (error) {
+      console.error("tavily failed", error);
+    }
+  }
+
+  const serper = Deno.env.get("SERPER_API_KEY")?.trim();
+  if (serper) {
+    try {
+      const resp = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-KEY": serper },
+        body: JSON.stringify({ q: query, num: Math.min(Math.max(count, 1), 20) }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const out = (data.organic ?? []).map((r: any) => ({
+          title: String(r.title ?? r.link ?? "").slice(0, 220),
+          url: String(r.link ?? ""),
+          snippet: String(r.snippet ?? "").slice(0, 900),
+        })).filter((r: WebSearchResult) => r.url);
+        if (out.length) return out.slice(0, count);
+      } else {
+        console.error(`serper HTTP ${resp.status}`);
+      }
+    } catch (error) {
+      console.error("serper failed", error);
+    }
+  }
+
+  return [];
+}
+
+
 async function braveSearch(query: string, count: number, offset = 0): Promise<WebSearchResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
