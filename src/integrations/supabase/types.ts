@@ -9791,6 +9791,30 @@ export type Database = {
         }
         Relationships: []
       }
+      video_quota_usage: {
+        Row: {
+          created_at: string
+          id: string
+          model: string | null
+          period: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          period?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          period?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       voice_templates: {
         Row: {
           audio_file_url: string
@@ -10715,10 +10739,12 @@ export type Database = {
         }
         Returns: Json
       }
-      consume_video_quota: {
-        Args: { _model: string; _unlimited?: boolean }
-        Returns: Json
-      }
+      consume_video_quota:
+        | {
+            Args: { _model?: string; _unlimited?: boolean; _user_id?: string }
+            Returns: Json
+          }
+        | { Args: { _model: string; _unlimited?: boolean }; Returns: Json }
       create_notification: {
         Args: {
           p_message: string
@@ -11052,6 +11078,7 @@ export type Database = {
         Returns: undefined
       }
       verify_external_api_key: { Args: { p_key_hash: string }; Returns: string }
+      video_quota_tier: { Args: { _user_id: string }; Returns: string }
       watchdog_resume_background: { Args: never; Returns: number }
       watchdog_resume_operator: { Args: never; Returns: undefined }
       workspace_accept_invite: { Args: { p_token: string }; Returns: Json }
