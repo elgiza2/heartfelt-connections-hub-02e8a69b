@@ -69,11 +69,13 @@ export default function ComputerTaskCard({ taskId }: Props) {
 
   const running = !timedOut && (!task || task.status === "pending" || task.status === "running");
   const files = task?.files ?? [];
-  const traceSteps = useMemo(() => events.map((event) => event.title).filter(Boolean), [events]);
+  // Internal bookkeeping (checkpoints, raw errors, JSON) never reaches the chat.
+  const traceSteps = useMemo(() => cleanTrace(events.map((event) => event.title)), [events]);
   const traceText = useMemo(
-    () => events.map((event) => event.detail).filter((value): value is string => !!value).join("\n\n"),
+    () => cleanTrace(events.map((event) => event.detail)).join("\n\n"),
     [events],
   );
+
   const liveUrl = task?.live_url ? `${task.live_url}${task.live_url.includes("?") ? "&" : "?"}view_only=true` : null;
 
   if (running) {
