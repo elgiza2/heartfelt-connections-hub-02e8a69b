@@ -251,7 +251,9 @@ async function callUpstream(
         return { ok: true, data, key };
       }
       const message = String(data?.error?.message || data?.message || data?.error || text || "").slice(0, 300);
+      console.error(`browser-use ${call.method} ${call.path} -> ${resp.status}: ${message}`);
       const retryAfter = Number(resp.headers.get("retry-after") || "") || undefined;
+
       await markFailure(supabase, key, resp.status, message, retryAfter);
       last = { ok: false, status: resp.status, message };
       // Bad request / validation errors are our fault — rotating keys won't help.
@@ -375,16 +377,44 @@ export async function handleComputerAgent(payload: ComputerPayload | null): Prom
         ? `Context from earlier in this conversation:\n${memory}\n\n---\nTask:\n${prompt}`
         : prompt;
 
-      const res = await callUpstream(supabase, {
+      // Browser Use rejects models that the account's plan does not include
+      // (403 "not available on the free plan"), so walk a candidate ladder
+      // starting from the configured model.
+      const llmCandidates = [
+        Deno.env.get("BROWSER_USE_LLM")?.trim() || undefined,
+        "browser-use-llm",
+        "bu-2-0-mini-preview",
+        "gemini-2.5-flash",
+        undefined,
+      ];
+
+      let res = await callUpstream(supabase, {
         path: "/tasks",
         method: "POST",
         body: {
           task: fullPrompt.slice(0, 50_000),
-          llm: Deno.env.get("BROWSER_USE_LLM") || undefined,
+          llm: llmCandidates[0],
           maxSteps: 100,
           vision: "auto",
         },
       });
+      for (let i = 1; i < llmCandidates.length && !res.ok; i += 1) {
+        const failMsg = (res as UpstreamFail).message ?? "";
+        if (!/not available on the|body.,.llm|Input should be/i.test(failMsg)) break;
+
+        if (llmCandidates[i] === llmCandidates[0]) continue;
+        res = await callUpstream(supabase, {
+          path: "/tasks",
+          method: "POST",
+          body: {
+            task: fullPrompt.slice(0, 50_000),
+            llm: llmCandidates[i],
+            maxSteps: 100,
+            vision: "auto",
+          },
+        });
+      }
+
 
       if (!res.ok) {
         const fail = res as UpstreamFail;
@@ -403,9 +433,11 @@ export async function handleComputerAgent(payload: ComputerPayload | null): Prom
       }
 
       const providerId = String(
-        res.data?.task_id ?? res.data?.id ?? res.data?.data?.task_id ?? "",
+        res.data?.task_id ?? res.data?.id ?? res.data?.data?.task_id ?? res.data?.data?.id ?? "",
       );
       if (!providerId) {
+        console.error(`browser-use create: no task id in ${JSON.stringify(res.data).slice(0, 500)}`);
+
         await supabase
           .from("computer_tasks")
           .update({ status: "failed", error: "provider_error", updated_at: new Date().toISOString() })

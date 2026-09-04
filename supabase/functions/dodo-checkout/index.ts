@@ -21,16 +21,45 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// SKU -> { plan, amount (USD), credits, interval }
-const SKU_TABLE: Record<
-  string,
-  { plan: string; amount: number; credits: number; interval: string }
-> = {
-  plan_pro_m_first: { plan: "pro", amount: 9, credits: 1000, interval: "month" },
-  plan_pro_m: { plan: "pro", amount: 19, credits: 1000, interval: "month" },
-  plan_elite_m: { plan: "elite", amount: 39, credits: 3000, interval: "month" },
-  plan_elite_m_first: { plan: "elite", amount: 19, credits: 3000, interval: "month" },
+// Dodo catalogue key -> { plan, amount (USD), credits }. Keys match the
+// `interval` column of public.dodo_products.
+const PLANS: Record<string, { plan: string; amount: number; credits: number }> = {
+  monthly: { plan: "pro", amount: 20, credits: 1000 },
+  monthly_intro: { plan: "pro", amount: 7, credits: 1000 },
+  monthly_winback: { plan: "pro", amount: 5, credits: 1000 },
+  yearly: { plan: "pro", amount: 160, credits: 12000 },
+  yearly_winback: { plan: "pro", amount: 149, credits: 12000 },
 };
+
+// Legacy SKUs still sent by older clients -> catalogue key.
+const SKU_TO_KEY: Record<string, string> = {
+  plan_pro_m: "monthly",
+  plan_pro_m_first: "monthly_intro",
+  plan_pro_m_winback: "monthly_winback",
+  plan_pro_y: "yearly",
+  plan_pro_y_winback: "yearly_winback",
+  plan_elite_m: "monthly",
+  plan_elite_m_first: "monthly_intro",
+  plan_elite_y: "yearly",
+};
+
+/** Resolves the catalogue key from any of sku / interval / trial / offer. */
+function resolveKey(p: Record<string, unknown>): string | null {
+  const sku = String(p.sku ?? "").trim();
+  if (sku && SKU_TO_KEY[sku]) return SKU_TO_KEY[sku];
+
+  const raw = String(p.interval ?? p.plan_interval ?? "monthly").toLowerCase();
+  const yearly = /year|annual|y$/.test(raw);
+  const offer = String(p.offer ?? "").toLowerCase();
+  const winback = p.winback === true || /winback|win_back|return/.test(offer);
+  const intro = p.trial === true || p.intro === true || /intro|first|trial/.test(offer);
+
+  if (yearly) return winback ? "yearly_winback" : "yearly";
+  if (winback) return "monthly_winback";
+  if (intro) return "monthly_intro";
+  return "monthly";
+}
+
 
 const API_BASE = (Deno.env.get("DODO_PAYMENTS_ENVIRONMENT") || "live_mode") === "test_mode"
   ? "https://test.dodopayments.com"
@@ -56,21 +85,24 @@ Deno.serve(async (req) => {
   }
 
   const sku = String(payload.sku ?? "");
-  const info = SKU_TABLE[sku];
-  if (!info) return json({ error: "unknown sku" }, 400);
+  const key = resolveKey(payload);
+  const info = key ? PLANS[key] : null;
+  if (!key || !info) return json({ error: "unknown plan" }, 400);
 
-  // Resolve the Dodo product for this tier/interval.
+  // Resolve the exact Dodo product for this catalogue key.
   const { data: product } = await admin
     .from("dodo_products")
     .select("product_id,interval")
-    .eq("tier", info.plan)
+    .eq("interval", key)
     .eq("active", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  const productId = product?.product_id ?? String(payload.product_id ?? "");
+  const productId = String(payload.product_id ?? "") || product?.product_id || "";
   if (!productId) {
-    return json({ error: `No Dodo product configured for plan "${info.plan}"` }, 503);
+    return json({ error: `No Dodo product configured for "${key}"` }, 503);
   }
-  const isSubscription = (product?.interval ?? info.interval) !== "one_time";
+  const isSubscription = true; // every catalogue entry is a recurring plan
 
   const orderId = `dodo_${crypto.randomUUID()}`;
   const siteUrl = Deno.env.get("SITE_URL") || "https://megsyai.com";
@@ -83,8 +115,9 @@ Deno.serve(async (req) => {
     credits: info.credits,
     plan: info.plan,
     status: "pending",
-    raw: { sku, product_id: productId },
+    raw: { sku, plan_key: key, product_id: productId },
   });
+
   if (insertErr) return json({ error: insertErr.message }, 500);
 
   const body = {
