@@ -172,7 +172,7 @@ const AnimatedInput = ({
     return () => window.removeEventListener("megsy:composer-insert", insert);
   }, [onChange]);
 
-  const isActive = focused || !!value;
+  
 
 
   useEffect(() => {
