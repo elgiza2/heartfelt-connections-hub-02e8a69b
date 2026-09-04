@@ -18,6 +18,8 @@ import ThinkingTrace from "@/components/chat/ThinkingTrace";
 import ChatMessage from "@/components/chat/ChatMessage";
 
 import { clearActiveComputerRun, setActiveComputerRun } from "@/lib/computer/activeRun";
+import { cleanTrace } from "@/lib/computer/traceCleanup";
+
 
 interface Props {
   taskId: string;
