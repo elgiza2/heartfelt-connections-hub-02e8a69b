@@ -1,4 +1,4 @@
-import { useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { AnimatePresence, m as motion } from "framer-motion";
 
 import { useNavigate } from "react-router-dom";
@@ -154,6 +154,7 @@ export default function MobileChatHeader({
   rightSlot,
   modelSlot,
   chatUserId,
+  scrollContainerRef,
   inlineRename,
 
   inlineInvite,
@@ -163,8 +164,21 @@ export default function MobileChatHeader({
   const [menuView, setMenuView] = useState<MenuView>("main");
   const navigate = useNavigate();
 
+  // Once the message list is scrolled the header sits on top of content, so it
+  // takes the page background colour instead of staying transparent.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const el = scrollContainerRef?.current;
+    const read = () =>
+      setScrolled((el ? el.scrollTop : window.scrollY) > 4);
+    read();
+    const target: HTMLElement | Window = el ?? window;
+    target.addEventListener("scroll", read, { passive: true });
+    return () => target.removeEventListener("scroll", read);
+  }, [scrollContainerRef]);
 
   const lang = useUserLang();
+
   const prefetchPricing = () => {
     void prefetchRoute("/pricing");
   };
@@ -215,7 +229,9 @@ export default function MobileChatHeader({
       <div
         data-testid="mobile-chat-header"
         style={{ top: "var(--promo-banner-h, 0px)" }}
-        className="mobile-chat-header md:hidden fixed inset-x-0 z-30 flex items-center gap-2 px-3 py-1.5 min-h-[44px] pt-[max(env(safe-area-inset-top),0.25rem)] pointer-events-none [&>*]:pointer-events-auto bg-transparent border-0"
+        className={`mobile-chat-header md:hidden fixed inset-x-0 z-30 flex items-center gap-2 px-3 py-1.5 min-h-[44px] pt-[max(env(safe-area-inset-top),0.25rem)] pointer-events-none [&>*]:pointer-events-auto border-0 transition-colors duration-200 ${
+          scrolled ? "bg-background pointer-events-auto" : "bg-transparent"
+        }`}
 
       >
         <button

@@ -762,12 +762,12 @@ const AuthPage = () => {
     );
   }
 
-  // ─── Mobile: OTP / set-password / reset-password / forgot-password ─────
+  // ─── OTP / set-password / reset-password / forgot-password (mobile) ─────
+  // Rendered by MobileAuthExtras, which now uses the exact same hero-video
+  // shell, typography and pill controls as the sign-up screen.
   if (
     isMobile &&
-    (step === "otp-signup" ||
-      step === "otp-2fa" ||
-      step === "otp-reset" ||
+    (isOtpStep ||
       step === "set-password" ||
       step === "reset-password" ||
       step === "forgot-password")
@@ -793,20 +793,17 @@ const AuthPage = () => {
           setShowNewPassword={setShowNewPassword}
           isSubmitting={isSubmitting}
           countdown={countdown}
-          onResendOtp={() => sendOTP(undefined, step === "otp-signup")}
-          region={region}
+          onResendOtp={() => void sendOTP(undefined, false)}
           onSubmitSetPassword={handleCreateAccount}
           onSubmitResetPassword={handleResetPassword}
           onSubmitForgotPassword={handleForgotPassword}
-          onBack={() => {
-            setOtpValues(["", "", "", "", "", ""]);
-            setNewPassword("");
-            setStep("email");
-          }}
+          onBack={handleBack}
         />
       </>
     );
   }
+
+
 
   // ─── Mobile email/password flow (over aurora bg) is handled below by adding
   //     a mobile back button that returns to intro1 ────────────────────────

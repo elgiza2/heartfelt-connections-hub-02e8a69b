@@ -95,10 +95,42 @@ function build(p: Payload): { subject: string; html: string; text: string } {
   }
 }
 
+const resendKey = () => Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
+
+async function sendResend(args: {
+  from: string;
+  fromName?: string | null;
+  to: string;
+  subject: string;
+  text: string;
+  html?: string | null;
+  replyTo?: string | null;
+}) {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: args.fromName ? `${args.fromName} <${args.from}>` : args.from,
+      to: [args.to],
+      subject: args.subject || "(no subject)",
+      text: args.text || " ",
+      ...(args.html ? { html: args.html } : {}),
+      ...(args.replyTo ? { reply_to: args.replyTo } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
-  if (!smtpConfigured()) return json({ error: "smtp not configured" }, 500);
+  const hasResend = resendKey().length > 8;
+  if (!smtpConfigured() && !hasResend) {
+    return json({ error: "no email provider configured (set RESEND_API_KEY or SMTP_*)" }, 500);
+  }
 
   let p: Payload;
   try {
@@ -111,13 +143,32 @@ Deno.serve(async (req) => {
   if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json({ error: "invalid to" }, 400);
 
   const { subject, html, text } = build(p);
-  const from = Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!;
+  const from =
+    Deno.env.get("EMAIL_FROM") ||
+    Deno.env.get("SMTP_FROM") ||
+    Deno.env.get("SMTP_USER") ||
+    "onboarding@resend.dev";
   const fromName = p.from_name ?? Deno.env.get("SMTP_FROM_NAME") ?? "Megsy";
+  const args = { from, fromName, to, subject, text, html, replyTo: p.reply_to ?? from };
 
-  try {
-    await sendSmtp({ from, fromName, to, subject, text, html, replyTo: p.reply_to ?? from });
-  } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "smtp failed" }, 502);
+  // Resend first when configured (no SMTP ports needed); SMTP as fallback.
+  const errors: string[] = [];
+  if (hasResend) {
+    try {
+      await sendResend(args);
+      return json({ ok: true, to, subject, via: "resend" });
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : "resend failed");
+    }
   }
-  return json({ ok: true, to, subject });
+  if (smtpConfigured()) {
+    try {
+      await sendSmtp(args);
+      return json({ ok: true, to, subject, via: "smtp" });
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : "smtp failed");
+    }
+  }
+  return json({ error: errors.join(" | ") || "send failed" }, 502);
 });
+
