@@ -76,22 +76,40 @@ export async function memoryIdentity(
 /** Compact memory block for the system prompt, or "" when nothing is relevant. */
 export async function recall(admin: any, userId: string | null, question: string): Promise<string> {
   if (!userId) return "";
-  const { data } = await admin
-    .from("agent_memory")
-    .select("kind,key,value,confidence")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(200);
-  const rows = (data ?? []) as MemoryRow[];
+  const [{ data }, { data: extra }] = await Promise.all([
+    admin
+      .from("agent_memory")
+      .select("kind,key,value,confidence,updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(300),
+    // Second store written by `memory-extract`; both are read so nothing the
+    // system ever learned about the user is invisible to the agent.
+    admin
+      .from("user_memory_entries")
+      .select("kind,key,value,confidence,updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(150)
+      .then((r: any) => r, () => ({ data: [] })),
+  ]);
+  const seen = new Set<string>();
+  const rows = ([...(data ?? []), ...(extra ?? [])] as MemoryRow[]).filter((row) => {
+    const id = `${row.kind}:${row.key}`.toLowerCase();
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return Boolean(row.key && row.value);
+  });
   if (!rows.length) return "";
 
   const wanted = new Set(tokens(question));
   const picked = rows
-    .map((row) => ({ row, weight: score(row, wanted) }))
+    .map((row) => ({ row, weight: score(row, wanted, question) }))
     .filter((entry) => entry.weight > 0.9)
     .sort((a, b) => b.weight - a.weight)
     .slice(0, MAX_RECALL)
     .map(({ row }) => `- (${row.kind}) ${row.key}: ${String(row.value).slice(0, 300)}`);
+
   if (!picked.length) return "";
 
   return `USER MEMORY (facts remembered from earlier conversations — apply silently, never list them back, and prefer the current message when it contradicts them):\n${
