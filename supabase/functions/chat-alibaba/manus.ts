@@ -273,15 +273,15 @@ async function runSpecialist(
 ): Promise<string> {
   const data = await raw(profile.models, {
     temperature: profile.temperature,
-    max_tokens: 2600,
+    max_tokens: 1500,
     messages: [
       {
         role: "system",
         content: `${profileSystem(profile)}
 
-You are executing ONE subtask for the lead agent, not talking to the user. Deliver the finished artifact or a dense brief: facts, numbers, code, copy — no preamble, no questions, no meta commentary. Max ~500 words unless code requires more.`,
+You are executing ONE subtask for the lead agent, not talking to the user. Deliver the finished artifact or a dense brief: facts, numbers, code, copy — no preamble, no questions, no meta commentary. Max ~320 words unless code requires more. No repetition, no restating the goal.`,
       },
-      { role: "user", content: context ? `${goal}\n\nEvidence available:\n${context.slice(0, 6000)}` : goal },
+      { role: "user", content: context ? `${goal}\n\nEvidence available:\n${context.slice(0, 3000)}` : goal },
     ],
   });
   const text = data?.choices?.[0]?.message?.content;
@@ -311,6 +311,8 @@ export async function runPrimaryAgent(opts: {
   const briefs: string[] = [];
   const sources: { title: string; url: string }[] = [];
   const used = new Set<string>();
+  /** Tool names actually executed — drives the trimmed catalog after planning. */
+  const usedTools = new Set<string>();
   let todo: string[] = [];
   let notes = "";
   let steps = 0;
@@ -503,7 +505,7 @@ export async function runPrimaryAgent(opts: {
   /** Advertised tool catalog: full while planning, then core + already used. */
   const catalog = (step: number) => {
     if (step < FULL_CATALOG_STEPS) return [...TOOLS, ...ACTION_TOOLS];
-    const keep = ACTION_TOOLS.filter((tool: any) => used.has(String(tool?.function?.name ?? "")));
+    const keep = ACTION_TOOLS.filter((tool: any) => usedTools.has(String(tool?.function?.name ?? "")));
     return [...TOOLS, ...keep];
   };
 
@@ -607,7 +609,7 @@ export async function runPrimaryAgent(opts: {
   }
   if (evidence.length) {
     parts.push(`LIVE EVIDENCE (write facts from this, cite as [n] using the source list):\n${
-      evidence.join("\n\n").slice(0, 24_000)
+      evidence.join("\n\n").slice(0, 12_000)
     }`);
   }
   if (sources.length) {
@@ -617,10 +619,10 @@ export async function runPrimaryAgent(opts: {
   }
   if (briefs.length) {
     parts.push(`SPECIALIST OUTPUT (merge into ONE seamless answer, never mention the specialists):\n${
-      briefs.join("\n\n").slice(0, 24_000)
+      briefs.join("\n\n").slice(0, 12_000)
     }`);
   }
-  if (notes) parts.push(`LEAD AGENT NOTES:\n${notes.slice(0, 6000)}`);
+  if (notes) parts.push(`LEAD AGENT NOTES:\n${notes.slice(0, 2500)}`);
 
   return { context: parts.join("\n\n"), todo, used: [...used], steps };
 }
