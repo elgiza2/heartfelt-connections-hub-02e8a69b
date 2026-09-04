@@ -14,6 +14,7 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { braveKey, braveSearch, readPage } from "./research.ts";
 import { AGENTS, type AgentProfile, profileSystem } from "./router.ts";
+import { ACTION_TOOLS, ACTION_TOOL_NAMES, actionLabel, runActionTool } from "./actionTools.ts";
 
 /** Non-streaming raw chat call (returns the parsed upstream JSON body). */
 export type RawCall = (
@@ -25,9 +26,9 @@ export type Frame = (frame: Record<string, unknown>) => void;
 
 /** Lead-agent model ladder: strongest first, cheap flash last as a rescue. */
 const LEAD_MODELS = ["qwen3.8-max", "qwen3.7-max", "qwen-max", "qwen-plus"];
-const MAX_STEPS = 8;
+const MAX_STEPS = 12;
 /** Hard wall-clock budget for the whole loop, so a turn never hangs. */
-const LOOP_BUDGET_MS = 150_000;
+const LOOP_BUDGET_MS = 240_000;
 const SPECIALIST_IDS = Object.keys(AGENTS).filter((id) => id !== "general");
 
 const LOOP_SYSTEM = `You are MEGSY's lead agent, running an autonomous work loop before the final answer is written.
@@ -45,7 +46,14 @@ How to work:
    - reviewer: verify facts, code and numbers before delivery.
    Delegate in the SAME message when subtasks are independent — they run in parallel.
 4. Use remember_fact only for durable user facts (name, business, stack, preferences), never for turn chatter.
-5. Stop as soon as you have enough. Then reply with plain text notes (no tool call): the key findings, decisions and open risks the final answer must use. Never write the user-facing answer here.
+5. EXECUTE, do not describe. You have real hands:
+   - build_and_deploy_app: whenever the user wants a site, app, landing page, tool, game or dashboard — build it AND deploy it, then hand over the single clean link. Never answer with code the user has to host themselves unless they asked for code only.
+   - computer_task / computer_task_status: long, open-ended work on a real cloud computer (logins, forms, bookings, purchases, multi-site flows). Start it and report progress.
+   - send_email / read_inbox: the user's own mailbox.
+   - generate_image / generate_video / create_slides: real media and decks.
+   - list_integrations / use_integration: the user's connected apps (MCP + Pipedream).
+   - use_skill: the user's saved skills — call it with no name to see them, then load the relevant one BEFORE doing the work.
+6. Stop as soon as you have enough. Then reply with plain text notes (no tool call): the key findings, decisions and open risks the final answer must use. Never write the user-facing answer here.
 
 Rules: never invent a tool result, never claim something ran that did not, keep every tool argument minimal, and never mention this loop, tools, agents or models to the user.`;
 
@@ -190,7 +198,7 @@ function toolLabel(name: string, args: any): string {
     case "write_todo":
       return `${Array.isArray(args?.items) ? args.items.length : 0} steps`;
     default:
-      return String(args?.key ?? "").slice(0, 80);
+      return actionLabel(name, args) || String(args?.key ?? "").slice(0, 80);
   }
 }
 
@@ -232,6 +240,8 @@ export async function runPrimaryAgent(opts: {
   userId: string | null;
   /** Set when the user forced a specialist from the UI. */
   forcedAgent?: string;
+  /** Caller's Supabase access token — lets the loop use user-scoped tools. */
+  authToken?: string | null;
 }): Promise<ManusResult> {
   const { admin, raw, question, send, userId } = opts;
   const started = Date.now();
@@ -350,8 +360,18 @@ export async function runPrimaryAgent(opts: {
           .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" });
         return "stored";
       }
-      default:
+      default: {
+        if (ACTION_TOOL_NAMES.has(name)) {
+          const output = await runActionTool(
+            { admin, userId, authToken: opts.authToken ?? null, raw, send },
+            name,
+            args,
+          );
+          evidence.push(`ACTION ${name}\n${output.slice(0, 3000)}`);
+          return output;
+        }
         return "unknown tool";
+      }
     }
   };
 
@@ -364,7 +384,7 @@ export async function runPrimaryAgent(opts: {
         temperature: 0.25,
         max_tokens: 1400,
         parallel_tool_calls: true,
-        tools: TOOLS,
+        tools: [...TOOLS, ...ACTION_TOOLS],
         messages,
       });
       const message = data?.choices?.[0]?.message;

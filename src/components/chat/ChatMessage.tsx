@@ -33,7 +33,7 @@ import { visit, SKIP } from "unist-util-visit";
 import { toString } from "mdast-util-to-string";
 import { toast } from "sonner";
 import ThinkingLoader from "./ThinkingLoader";
-import ParallelAgentsPanel, { type ParallelAgentTask } from "./ParallelAgentsPanel";
+import { type ParallelAgentTask } from "./ParallelAgentsPanel";
 import { detectLang, langDir } from "@/lib/detectLang";
 import { parseLearnSegments, hasLearnCards } from "@/lib/learnCardParser";
 import { parseConnectSegments, hasConnectCards } from "@/lib/chat/connectCardParser";
@@ -1452,6 +1452,13 @@ const ChatMessage = ({
     const line = [name, target].filter(Boolean).join(" · ");
     return line ? [line] : undefined;
   }, [toolActivity]);
+  // The icon of the tool that is running right now replaces the waiting star.
+  const activeToolName = useMemo(() => {
+    const running = toolParts?.find((part) => part.state === "running");
+    if (running) return running.appSlug || running.name;
+    if (toolActivity?.status === "running" && toolActivity.name) return toolActivity.name;
+    return null;
+  }, [toolParts, toolActivity]);
   // Stay in the "thinking" state for the whole turn — including while the
   // model is picking / invoking a tool (reasoning tokens already streaming).
   const showLiveThinkingTrace =
@@ -1489,6 +1496,7 @@ const ChatMessage = ({
             steps={narrations!}
             status={searchStatus}
             active={isResearchActive}
+            tool={activeToolName}
             running={hasRunningTool || toolActivity?.status === "running"}
           />
         )}
@@ -1498,12 +1506,10 @@ const ChatMessage = ({
             steps={[...(narrations || []), ...(activeThinkingSteps || [])]}
             text={reasoning}
             active
+            tool={activeToolName}
             running={hasRunningTool || toolActivity?.status === "running"}
             className={content ? "mb-2" : ""}
           />
-        )}
-        {role === "assistant" && parallelTasks && parallelTasks.length > 1 && (
-          <ParallelAgentsPanel tasks={parallelTasks} active={!!isStreaming || !!isThinking} />
         )}
         {role === "assistant" &&
           reasoning &&
@@ -1514,6 +1520,7 @@ const ChatMessage = ({
               text={reasoning}
               status={searchStatus}
               active
+              tool={activeToolName}
               running={hasRunningTool || toolActivity?.status === "running"}
             />
           )}
