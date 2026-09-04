@@ -3134,6 +3134,54 @@ export type Database = {
         }
         Relationships: []
       }
+      dodo_orders: {
+        Row: {
+          amount: number
+          created_at: string
+          credits: number
+          currency: string
+          dodo_payment_id: string | null
+          dodo_subscription_id: string | null
+          id: string
+          order_id: string
+          plan: string | null
+          raw: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credits?: number
+          currency?: string
+          dodo_payment_id?: string | null
+          dodo_subscription_id?: string | null
+          id?: string
+          order_id: string
+          plan?: string | null
+          raw?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits?: number
+          currency?: string
+          dodo_payment_id?: string | null
+          dodo_subscription_id?: string | null
+          id?: string
+          order_id?: string
+          plan?: string | null
+          raw?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dodo_products: {
         Row: {
           active: boolean
