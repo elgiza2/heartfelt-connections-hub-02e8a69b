@@ -85,21 +85,24 @@ Deno.serve(async (req) => {
   }
 
   const sku = String(payload.sku ?? "");
-  const info = SKU_TABLE[sku];
-  if (!info) return json({ error: "unknown sku" }, 400);
+  const key = resolveKey(payload);
+  const info = key ? PLANS[key] : null;
+  if (!key || !info) return json({ error: "unknown plan" }, 400);
 
-  // Resolve the Dodo product for this tier/interval.
+  // Resolve the exact Dodo product for this catalogue key.
   const { data: product } = await admin
     .from("dodo_products")
     .select("product_id,interval")
-    .eq("tier", info.plan)
+    .eq("interval", key)
     .eq("active", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  const productId = product?.product_id ?? String(payload.product_id ?? "");
+  const productId = String(payload.product_id ?? "") || product?.product_id || "";
   if (!productId) {
-    return json({ error: `No Dodo product configured for plan "${info.plan}"` }, 503);
+    return json({ error: `No Dodo product configured for "${key}"` }, 503);
   }
-  const isSubscription = (product?.interval ?? info.interval) !== "one_time";
+  const isSubscription = true; // every catalogue entry is a recurring plan
 
   const orderId = `dodo_${crypto.randomUUID()}`;
   const siteUrl = Deno.env.get("SITE_URL") || "https://megsyai.com";
@@ -112,8 +115,9 @@ Deno.serve(async (req) => {
     credits: info.credits,
     plan: info.plan,
     status: "pending",
-    raw: { sku, product_id: productId },
+    raw: { sku, plan_key: key, product_id: productId },
   });
+
   if (insertErr) return json({ error: insertErr.message }, 500);
 
   const body = {
